@@ -14,7 +14,7 @@ export const getActivites = async (req: AuthRequest, res: Response, next: NextFu
       orderBy: { dateHeureDebut: 'asc' },
       include: {
         camp: { select: { id: true, nom: true } },
-        animateur: { include: { user: { select: { nom: true, prenom: true } } } },
+        animateur: true,
         groupes: { include: { groupe: { select: { nom: true, couleur: true } } } },
       },
     })

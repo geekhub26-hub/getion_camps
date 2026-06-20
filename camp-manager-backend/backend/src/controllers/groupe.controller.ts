@@ -20,7 +20,7 @@ export const getGroupes = async (req: AuthRequest, res: Response, next: NextFunc
         orderBy: { nom: 'asc' },
         include: {
           animateur: {
-            include: { user: { select: { nom: true, prenom: true, email: true } } }
+            select: { id: true, nom: true, prenom: true, telephone: true }
           },
           _count: { select: { participants: true } }
         },
@@ -47,7 +47,7 @@ export const getGroupeById = async (req: AuthRequest, res: Response, next: NextF
       include: {
         camp: { select: { id: true, nom: true } },
         animateur: {
-          include: { user: { select: { nom: true, prenom: true, email: true, avatarUrl: true } } }
+          select: { id: true, nom: true, prenom: true, telephone: true }
         },
         participants: {
           include: {
@@ -94,7 +94,7 @@ export const createGroupe = async (req: AuthRequest, res: Response, next: NextFu
         description,
       },
       include: {
-        animateur: { include: { user: { select: { nom: true, prenom: true } } } }
+        animateur: true
       }
     })
 
@@ -124,7 +124,7 @@ export const updateGroupe = async (req: AuthRequest, res: Response, next: NextFu
         description: req.body.description,
       },
       include: {
-        animateur: { include: { user: { select: { nom: true, prenom: true } } } }
+        animateur: true
       }
     })
 

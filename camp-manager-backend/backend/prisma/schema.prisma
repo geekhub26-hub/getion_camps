@@ -115,7 +115,6 @@ model User {
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  animateur        Animateur?
   messagesEnvoyes  Message[]      @relation("expediteur")
   notifications    Notification[]
 
@@ -246,7 +245,8 @@ model Parent {
 
 model Animateur {
   id          String          @id @default(uuid())
-  userId      String          @unique @map("user_id")
+  nom         String
+  prenom      String
   campId      String          @map("camp_id")
   specialite  String?
   telephone   String?
@@ -257,7 +257,6 @@ model Animateur {
   createdAt   DateTime        @default(now()) @map("created_at")
 
   // Relations
-  user        User       @relation(fields: [userId], references: [id])
   camp        Camp       @relation(fields: [campId], references: [id], onDelete: Cascade)
   activites   Activite[]
   groupes     Groupe[]

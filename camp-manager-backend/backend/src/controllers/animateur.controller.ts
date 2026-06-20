@@ -3,212 +3,110 @@ import prisma from '../config/prisma'
 import { sendSuccess, sendCreated } from '../utils/response'
 import { AppError } from '../middlewares/error.middleware'
 import { AuthRequest } from '../types'
-import bcrypt from 'bcryptjs'
 
-// ─── GET /camps/:campId/animateurs ────────────────────────────
+const include = {
+  camp: { select: { id: true, nom: true } },
+  _count: { select: { activites: true, groupes: true } },
+}
+
+// GET /api/animateurs?campId=xxx
 export const getAnimateurs = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { campId } = req.params
-    const { page = 1, perPage = 20, statut } = req.query
-
-    const skip = (Number(page) - 1) * Number(perPage)
-    const where: any = { campId }
-    if (statut) where.statut = statut
+    const { campId, page = 1, perPage = 50 } = req.query
+    const where: any = {}
+    if (campId) where.campId = campId
 
     const [animateurs, total] = await Promise.all([
       prisma.animateur.findMany({
         where,
-        skip,
+        skip: (Number(page) - 1) * Number(perPage),
         take: Number(perPage),
-        orderBy: { createdAt: 'desc' },
-        include: {
-          user: {
-            select: { id: true, nom: true, prenom: true, email: true, avatarUrl: true, actif: true }
-          },
-          _count: { select: { activites: true, groupes: true } }
-        },
+        orderBy: { nom: 'asc' },
+        include,
       }),
       prisma.animateur.count({ where }),
     ])
-
     sendSuccess(res, animateurs, 'Animateurs récupérés', 200, {
-      total,
-      page: Number(page),
-      perPage: Number(perPage),
+      total, page: Number(page), perPage: Number(perPage),
       totalPages: Math.ceil(total / Number(perPage)),
     })
-  } catch (err) {
-    next(err)
-  }
+  } catch (e) { next(e) }
 }
 
-// ─── GET /animateurs/:id ──────────────────────────────────────
+// GET /api/animateurs/:id
 export const getAnimateurById = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const animateur = await prisma.animateur.findUnique({
       where: { id: req.params.id },
       include: {
-        user: {
-          select: { id: true, nom: true, prenom: true, email: true, avatarUrl: true, actif: true, role: true }
-        },
-        camp: { select: { id: true, nom: true } },
-        groupes: { select: { id: true, nom: true, couleur: true, _count: { select: { participants: true } } } },
-        activites: {
-          orderBy: { dateHeureDebut: 'desc' },
-          take: 10,
-          select: { id: true, titre: true, dateHeureDebut: true, statut: true }
-        }
+        ...include,
+        groupes: { select: { id: true, nom: true, couleur: true } },
+        activites: { orderBy: { dateHeureDebut: 'desc' }, take: 10, select: { id: true, titre: true, dateHeureDebut: true, statut: true } },
       },
     })
     if (!animateur) throw new AppError('Animateur introuvable', 404)
-
     sendSuccess(res, animateur)
-  } catch (err) {
-    next(err)
-  }
+  } catch (e) { next(e) }
 }
 
-// ─── POST /camps/:campId/animateurs ───────────────────────────
+// POST /api/animateurs
 export const createAnimateur = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { campId } = req.params
-    const { userId, specialite, telephone, dateArrivee, dateDepart } = req.body
-
-    // Vérifier que le camp existe
+    const { campId, nom, prenom, specialite, telephone, missions, statut, dateArrivee, dateDepart } = req.body
+    if (!campId || !nom?.trim() || !prenom?.trim()) {
+      throw new AppError('Camp, nom et prénom sont requis', 400)
+    }
     const camp = await prisma.camp.findUnique({ where: { id: campId } })
     if (!camp) throw new AppError('Camp introuvable', 404)
-
-    // Vérifier que l'utilisateur existe
-    const user = await prisma.user.findUnique({ where: { id: userId } })
-    if (!user) throw new AppError('Utilisateur introuvable', 404)
-
-    // Vérifier que l'utilisateur n'est pas déjà animateur dans ce camp
-    const existing = await prisma.animateur.findFirst({
-      where: { userId, campId }
-    })
-    if (existing) throw new AppError('Cet utilisateur est déjà animateur dans ce camp', 409)
 
     const animateur = await prisma.animateur.create({
       data: {
-        userId,
+        nom: nom.trim(),
+        prenom: prenom.trim(),
         campId,
-        specialite,
-        telephone,
+        specialite: specialite || null,
+        telephone: telephone || null,
+        missions: missions || null,
+        statut: statut || 'ACTIF',
         dateArrivee: dateArrivee ? new Date(dateArrivee) : undefined,
         dateDepart: dateDepart ? new Date(dateDepart) : undefined,
       },
-      include: {
-        user: { select: { nom: true, prenom: true, email: true } },
-        camp: { select: { nom: true } }
-      }
+      include,
     })
-
-    sendCreated(res, animateur, 'Animateur ajouté au camp')
-  } catch (err) {
-    next(err)
-  }
+    sendCreated(res, animateur, 'Animateur créé')
+  } catch (e) { next(e) }
 }
 
-// ─── POST /animateurs/creer ───────────────────────────────────
-// Crée un compte utilisateur + animateur en une seule requête
-export const createAnimateurAvecCompte = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { campId, nom, prenom, email, motDePasse, specialite, telephone, missions, statut, dateArrivee, dateDepart } = req.body
-
-    if (!nom || !prenom || !email || !motDePasse || !campId) {
-      throw new AppError('Nom, prénom, email, mot de passe et camp sont requis', 400)
-    }
-
-    const camp = await prisma.camp.findUnique({ where: { id: campId } })
-    if (!camp) throw new AppError('Camp introuvable', 404)
-
-    const emailExist = await prisma.user.findUnique({ where: { email } })
-    if (emailExist) throw new AppError('Un compte avec cet email existe déjà', 409)
-
-    const hash = await bcrypt.hash(motDePasse, 12)
-
-    const animateur = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: { nom, prenom, email, motDePasseHash: hash, role: 'ANIMATEUR' }
-      })
-      return tx.animateur.create({
-        data: {
-          userId: user.id,
-          campId,
-          specialite: specialite || null,
-          telephone: telephone || null,
-          missions: missions || null,
-          statut: statut || 'ACTIF',
-          dateArrivee: dateArrivee ? new Date(dateArrivee) : undefined,
-          dateDepart: dateDepart ? new Date(dateDepart) : undefined,
-        },
-        include: {
-          user: { select: { id: true, nom: true, prenom: true, email: true, role: true } },
-          camp: { select: { nom: true } }
-        }
-      })
-    })
-
-    sendCreated(res, animateur, 'Compte animateur créé')
-  } catch (err) {
-    next(err)
-  }
-}
-
-// ─── PUT /animateurs/:id ──────────────────────────────────────
+// PUT /api/animateurs/:id
 export const updateAnimateur = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const animateur = await prisma.animateur.findUnique({ where: { id: req.params.id } })
     if (!animateur) throw new AppError('Animateur introuvable', 404)
-
+    const { nom, prenom, specialite, telephone, missions, statut, dateArrivee, dateDepart } = req.body
     const updated = await prisma.animateur.update({
       where: { id: req.params.id },
       data: {
-        specialite: req.body.specialite,
-        telephone: req.body.telephone,
-        missions: req.body.missions,
-        statut: req.body.statut,
-        dateArrivee: req.body.dateArrivee ? new Date(req.body.dateArrivee) : undefined,
-        dateDepart: req.body.dateDepart ? new Date(req.body.dateDepart) : undefined,
+        nom: nom?.trim() ?? animateur.nom,
+        prenom: prenom?.trim() ?? animateur.prenom,
+        specialite: specialite !== undefined ? (specialite || null) : animateur.specialite,
+        telephone: telephone !== undefined ? (telephone || null) : animateur.telephone,
+        missions: missions !== undefined ? (missions || null) : animateur.missions,
+        statut: statut ?? animateur.statut,
+        dateArrivee: dateArrivee ? new Date(dateArrivee) : animateur.dateArrivee,
+        dateDepart: dateDepart ? new Date(dateDepart) : animateur.dateDepart,
       },
-      include: {
-        user: { select: { nom: true, prenom: true, email: true } }
-      }
+      include,
     })
-
     sendSuccess(res, updated, 'Animateur mis à jour')
-  } catch (err) {
-    next(err)
-  }
+  } catch (e) { next(e) }
 }
 
-// ─── DELETE /animateurs/:id ───────────────────────────────────
+// DELETE /api/animateurs/:id
 export const deleteAnimateur = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const animateur = await prisma.animateur.findUnique({ where: { id: req.params.id } })
     if (!animateur) throw new AppError('Animateur introuvable', 404)
-
     await prisma.animateur.delete({ where: { id: req.params.id } })
-    sendSuccess(res, null, 'Animateur retiré du camp')
-  } catch (err) {
-    next(err)
-  }
-}
-
-// ─── GET /animateurs/disponibles ──────────────────────────────
-export const getAnimateursDisponibles = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const animateurs = await prisma.animateur.findMany({
-      where: { statut: 'ACTIF' },
-      include: {
-        user: { select: { id: true, nom: true, prenom: true, email: true } },
-        camp: { select: { id: true, nom: true } }
-      },
-      orderBy: { user: { nom: 'asc' } }
-    })
-
-    sendSuccess(res, animateurs, 'Animateurs disponibles récupérés')
-  } catch (err) {
-    next(err)
-  }
+    sendSuccess(res, null, 'Animateur supprimé')
+  } catch (e) { next(e) }
 }

@@ -50,7 +50,7 @@ export const getCampById = async (req: AuthRequest, res: Response, next: NextFun
     const camp = await prisma.camp.findUnique({
       where: { id: req.params.id },
       include: {
-        animateurs: { include: { user: { select: { nom: true, prenom: true, email: true, avatarUrl: true } } } },
+        animateurs: true,
         groupes: { include: { _count: { select: { participants: true } } } },
         _count: { select: { participants: true, activites: true } },
       },
