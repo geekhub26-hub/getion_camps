@@ -3,6 +3,7 @@ import prisma from '../config/prisma'
 import { sendSuccess, sendCreated } from '../utils/response'
 import { AppError } from '../middlewares/error.middleware'
 import { AuthRequest } from '../types'
+import bcrypt from 'bcryptjs'
 
 // ─── GET /camps/:campId/animateurs ────────────────────────────
 export const getAnimateurs = async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -108,6 +109,52 @@ export const createAnimateur = async (req: AuthRequest, res: Response, next: Nex
   }
 }
 
+// ─── POST /animateurs/creer ───────────────────────────────────
+// Crée un compte utilisateur + animateur en une seule requête
+export const createAnimateurAvecCompte = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { campId, nom, prenom, email, motDePasse, specialite, telephone, missions, statut, dateArrivee, dateDepart } = req.body
+
+    if (!nom || !prenom || !email || !motDePasse || !campId) {
+      throw new AppError('Nom, prénom, email, mot de passe et camp sont requis', 400)
+    }
+
+    const camp = await prisma.camp.findUnique({ where: { id: campId } })
+    if (!camp) throw new AppError('Camp introuvable', 404)
+
+    const emailExist = await prisma.user.findUnique({ where: { email } })
+    if (emailExist) throw new AppError('Un compte avec cet email existe déjà', 409)
+
+    const hash = await bcrypt.hash(motDePasse, 12)
+
+    const animateur = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: { nom, prenom, email, motDePasseHash: hash, role: 'ANIMATEUR' }
+      })
+      return tx.animateur.create({
+        data: {
+          userId: user.id,
+          campId,
+          specialite: specialite || null,
+          telephone: telephone || null,
+          missions: missions || null,
+          statut: statut || 'ACTIF',
+          dateArrivee: dateArrivee ? new Date(dateArrivee) : undefined,
+          dateDepart: dateDepart ? new Date(dateDepart) : undefined,
+        },
+        include: {
+          user: { select: { id: true, nom: true, prenom: true, email: true, role: true } },
+          camp: { select: { nom: true } }
+        }
+      })
+    })
+
+    sendCreated(res, animateur, 'Compte animateur créé')
+  } catch (err) {
+    next(err)
+  }
+}
+
 // ─── PUT /animateurs/:id ──────────────────────────────────────
 export const updateAnimateur = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -119,6 +166,7 @@ export const updateAnimateur = async (req: AuthRequest, res: Response, next: Nex
       data: {
         specialite: req.body.specialite,
         telephone: req.body.telephone,
+        missions: req.body.missions,
         statut: req.body.statut,
         dateArrivee: req.body.dateArrivee ? new Date(req.body.dateArrivee) : undefined,
         dateDepart: req.body.dateDepart ? new Date(req.body.dateDepart) : undefined,

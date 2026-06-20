@@ -15,6 +15,9 @@ router.get('/animateurs/:id', staffOnly, animateur.getAnimateurById)
 router.put('/animateurs/:id', adminOnly, animateur.updateAnimateur)
 router.delete('/animateurs/:id', adminOnly, animateur.deleteAnimateur)
 
+// Créer compte + animateur en une étape (admin only)
+router.post('/animateurs/creer', adminOnly, animateur.createAnimateurAvecCompte)
+
 // Route utilitaire
 router.get('/animateurs/disponibles/liste', staffOnly, animateur.getAnimateursDisponibles)
 

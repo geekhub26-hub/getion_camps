@@ -250,6 +250,7 @@ model Animateur {
   campId      String          @map("camp_id")
   specialite  String?
   telephone   String?
+  missions    String?
   statut      StatutAnimateur @default(ACTIF)
   dateArrivee DateTime?       @map("date_arrivee")
   dateDepart  DateTime?       @map("date_depart")
