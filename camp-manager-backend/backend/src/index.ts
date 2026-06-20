@@ -27,6 +27,8 @@ import donRoutes from './routes/don.routes'
 const app = express()
 const PORT = process.env.PORT || 3001
 
+app.set('trust proxy', 1)
+
 // ─── Sécurité ────────────────────────────────────────────────
 app.use(helmet())
 app.use(cors({
