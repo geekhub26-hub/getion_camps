@@ -12,13 +12,14 @@ interface Groupe {
   description: string | null
   campId: string
   _count?: { participants: number }
-  animateur?: { user: { nom: string; prenom: string; email: string } }
+  animateur?: { id: string; nom: string; prenom: string; telephone: string | null }
 }
 
 interface AnimateurSimple {
   id: string
-  user: { nom: string; prenom: string; email: string }
-  camp: { id: string; nom: string }
+  nom: string
+  prenom: string
+  telephone: string | null
 }
 
 function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: React.ReactNode }) {
@@ -70,7 +71,7 @@ function GroupeCard({ groupe, onDelete, onEdit }: {
           <div>
             <h3 className="font-display font-700 text-base text-ink">{groupe.nom}</h3>
             <p className="text-xs text-ink-3">
-              {groupe.animateur?.user?.prenom} {groupe.animateur?.user?.nom || 'Animateur non assigné'}
+              {groupe.animateur ? `${groupe.animateur.prenom} ${groupe.animateur.nom}` : 'Animateur non assigné'}
             </p>
           </div>
         </div>
@@ -148,9 +149,9 @@ export default function GroupesPage() {
       .finally(() => setLoading(false))
   }
 
-  // Charger les animateurs disponibles
   const loadAnimateurs = () => {
-    api.get('/animateurs/disponibles/liste')
+    if (!campId) return
+    api.get(`/animateurs?campId=${campId}&perPage=100`)
       .then(res => setAnimateurs(res.data.data || []))
       .catch(() => setAnimateurs([]))
   }
@@ -260,7 +261,7 @@ export default function GroupesPage() {
                   <option value="">Non assigné</option>
                   {animateurs.map(a => (
                     <option key={a.id} value={a.id}>
-                      {a.user?.prenom} {a.user?.nom} - {a.camp?.nom}
+                      {a.prenom} {a.nom}{a.telephone ? ` · ${a.telephone}` : ''}
                     </option>
                   ))}
                 </select>

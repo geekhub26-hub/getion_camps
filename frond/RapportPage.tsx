@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react'
 import {
   FileText, Printer, Download, RefreshCw, CreditCard,
-  ArrowUpRight, ClipboardList, UserCheck, Gift, Calendar,
+  ArrowUpRight, ClipboardList, UserCheck, Gift, Calendar, Users, BookOpen, ChevronDown,
 } from 'lucide-react'
 import api from './http'
 import type { Don, FichePresence, Visiteur } from './index'
 import { formatCFA } from './helpers'
 
 type ApiList<T> = { data: T[] }
+
+type CampItem = { id: string; nom: string; lieu: string; dateDebut: string; dateFin: string }
+type AnimateurItem = { id: string; nom: string; prenom: string; specialite: string | null; telephone: string | null; missions: string | null; statut: string }
+type GroupeItem    = { id: string; nom: string; couleur: string; description: string | null; animateur?: { nom: string; prenom: string } | null; _count?: { participants: number } }
 
 type PayItem = {
   id: string; participantId: string; montant: number; montantTotal: number
@@ -63,12 +67,31 @@ export default function RapportPage() {
   const [dateFin,   setDateFin]   = useState(today)
   const [loading, setLoading] = useState(false)
 
+  const [camps, setCamps]         = useState<CampItem[]>([])
+  const [campId, setCampId]       = useState('')
+  const [animateurs, setAnimateurs] = useState<AnimateurItem[]>([])
+  const [groupes, setGroupes]     = useState<GroupeItem[]>([])
+
   const [paiements, setPaiements] = useState<PayItem[]>([])
   const [depenses, setDepenses]   = useState<DepItem[]>([])
   const [fiches, setFiches]       = useState<FichePresence[]>([])
   const [visiteurs, setVisiteurs] = useState<Visiteur[]>([])
   const [dons, setDons]           = useState<Don[]>([])
   const [activites, setActivites] = useState<ActiviteItem[]>([])
+
+  useEffect(() => {
+    api.get<ApiList<CampItem>>('/camps?perPage=100')
+      .then(r => { const list = r.data.data || []; setCamps(list); if (list[0]) setCampId(list[0].id) })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (!campId) return
+    api.get<ApiList<AnimateurItem>>(`/animateurs?campId=${campId}&perPage=100`)
+      .then(r => setAnimateurs(r.data.data || [])).catch(() => setAnimateurs([]))
+    api.get<ApiList<GroupeItem>>(`/camps/${campId}/groupes?perPage=100`)
+      .then(r => setGroupes(r.data.data || [])).catch(() => setGroupes([]))
+  }, [campId])
 
   const load = async () => {
     setLoading(true)
@@ -105,87 +128,142 @@ export default function RapportPage() {
 
   const printRapport = () => {
     const periode = periodeLabel()
-    const tableRows = (cols: string[], items: string[][]) =>
-      `<table><thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${items.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+    const campInfo = camps.find(c => c.id === campId)
+    const tbl = (cols: string[], rows: string[][], empty: string) =>
+      rows.length
+        ? `<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+        : `<p class="empty">${empty}</p>`
 
-    const win = window.open('', '_blank', 'width=860,height=1000')
+    const animCards = animateurs.map(a => `
+      <div class="anim-card">
+        <div class="anim-header">
+          <strong>${a.prenom} ${a.nom}</strong>
+          <span class="badge ${a.statut === 'ACTIF' ? 'badge-green' : 'badge-gray'}">${a.statut}</span>
+        </div>
+        ${a.specialite ? `<div class="anim-meta">🎯 ${a.specialite}${a.telephone ? ` &nbsp;·&nbsp; 📞 ${a.telephone}` : ''}</div>` : ''}
+        ${a.missions ? `<div class="anim-missions"><strong>Missions :</strong><br>${a.missions.replace(/\n/g,'<br>')}</div>` : '<div class="anim-missions empty-txt">Aucune mission définie.</div>'}
+      </div>`).join('')
+
+    const groupeRows = groupes.map(g => [
+      `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${g.couleur};margin-right:6px"></span>${g.nom}`,
+      g.animateur ? `${g.animateur.prenom} ${g.animateur.nom}` : '—',
+      String(g._count?.participants ?? 0),
+      g.description || '—',
+    ])
+
+    const win = window.open('', '_blank', 'width=900,height=1100')
     if (!win) return
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Rapport ${periode}</title>
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>Rapport journalier — ${periode}</title>
     <style>
       *{margin:0;padding:0;box-sizing:border-box}
-      body{font-family:'Segoe UI',sans-serif;padding:32px;color:#0f172a;font-size:12.5px}
-      h1{font-size:22px;font-weight:700;margin-bottom:2px}
-      p.sub{color:#64748b;font-size:13px;margin-bottom:24px}
-      .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px}
-      .kpi{border:1px solid #e2e8f0;border-radius:10px;padding:12px}
-      .kpi .label{font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
-      .kpi .val{font-size:18px;font-weight:700}
-      .green{color:#16a34a}.red{color:#dc2626}.gold{color:#d97706}.blue{color:#2563eb}
-      h2{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin:20px 0 8px;border-bottom:1px solid #e2e8f0;padding-bottom:4px}
-      table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12px}
-      th{background:#f8fafc;font-size:10px;text-transform:uppercase;color:#94a3b8;padding:7px 10px;text-align:left;border-bottom:1px solid #e2e8f0}
-      td{padding:7px 10px;border-bottom:1px solid #f1f5f9}
-      .empty{padding:12px 10px;color:#94a3b8;font-style:italic;font-size:12px}
-      footer{margin-top:28px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:10px;color:#94a3b8}
+      body{font-family:'Segoe UI',Arial,sans-serif;padding:36px;color:#0f172a;font-size:12.5px;line-height:1.5}
+      .header{background:linear-gradient(135deg,#1e3a5f 0%,#2d6a4f 100%);color:#fff;padding:24px 28px;border-radius:14px;margin-bottom:24px}
+      .header h1{font-size:20px;font-weight:700;margin-bottom:4px}
+      .header .meta{opacity:.85;font-size:12px}
+      .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:22px}
+      .kpi{border:1px solid #e2e8f0;border-radius:10px;padding:12px 10px;text-align:center}
+      .kpi .label{font-size:9.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+      .kpi .val{font-size:16px;font-weight:700}
+      .green{color:#16a34a}.red{color:#dc2626}.gold{color:#d97706}.blue{color:#2563eb}.gray{color:#64748b}
+      h2{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#475569;margin:20px 0 8px;padding-bottom:5px;border-bottom:2px solid #e2e8f0;display:flex;align-items:center;gap:6px}
+      h2 .ico{font-size:13px}
+      table{width:100%;border-collapse:collapse;margin-bottom:4px;font-size:11.5px}
+      th{background:#f8fafc;font-size:9.5px;text-transform:uppercase;color:#94a3b8;padding:6px 10px;text-align:left;border-bottom:1px solid #e2e8f0}
+      td{padding:6px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top}
+      tr:last-child td{border-bottom:none}
+      .empty{padding:10px 0;color:#94a3b8;font-style:italic;font-size:11.5px}
+      .empty-txt{color:#94a3b8;font-style:italic}
+      .total-row{background:#f8fafc;font-weight:700}
+      .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600}
+      .badge-green{background:#dcfce7;color:#16a34a}
+      .badge-gray{background:#f1f5f9;color:#64748b}
+      .animateurs-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px}
+      .anim-card{border:1px solid #e2e8f0;border-radius:10px;padding:12px}
+      .anim-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;font-size:12.5px}
+      .anim-meta{font-size:11px;color:#64748b;margin-bottom:5px}
+      .anim-missions{font-size:11px;color:#374151;background:#f8fafc;border-radius:6px;padding:8px 10px;margin-top:4px;white-space:pre-wrap}
+      footer{margin-top:28px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:10px;color:#94a3b8;display:flex;justify-content:space-between}
+      @media print{body{padding:18px}.header{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
     </style></head><body>
-    <h1>Rapport de caisse</h1>
-    <p class="sub">${periode}</p>
-    <div class="kpis">
-      <div class="kpi"><div class="label">Encaissements</div><div class="val green">${formatCFA(totalEncaisse)}</div></div>
-      <div class="kpi"><div class="label">Dépenses</div><div class="val red">${formatCFA(totalDepenses)}</div></div>
-      <div class="kpi"><div class="label">Solde net</div><div class="val ${soldeDuJour >= 0 ? 'green' : 'red'}">${formatCFA(soldeDuJour)}</div></div>
-      <div class="kpi"><div class="label">Dons reçus</div><div class="val gold">${totalDons > 0 ? formatCFA(totalDons) : dons.length + ' don(s)'}</div></div>
+
+    <div class="header">
+      <h1>📋 Rapport journalier — ${periode}</h1>
+      <div class="meta">
+        ${campInfo ? `⛺ ${campInfo.nom} &nbsp;·&nbsp; 📍 ${campInfo.lieu}` : 'Tous les camps'}
+        &nbsp;·&nbsp; Généré le ${new Date().toLocaleString('fr-FR')}
+      </div>
     </div>
 
-    <h2>Encaissements (${paiements.length})</h2>
-    ${paiements.length ? tableRows(['Participant','Camp','Montant','Mode','Référence'], paiements.map(p => [
-      `${p.participant.prenom} ${p.participant.nom}`,
-      p.participant.camp?.nom || '—',
-      `<span class="green" style="font-weight:600">+${formatCFA(Number(p.montant))}</span>`,
-      METHODES[p.methode] || p.methode,
-      p.reference || '—'
-    ])) : '<p class="empty">Aucun encaissement ce jour.</p>'}
+    <div class="kpis">
+      <div class="kpi"><div class="label">Encaissé</div><div class="val green">+${formatCFA(totalEncaisse)}</div></div>
+      <div class="kpi"><div class="label">Dépensé</div><div class="val red">-${formatCFA(totalDepenses)}</div></div>
+      <div class="kpi"><div class="label">Solde net</div><div class="val ${soldeDuJour>=0?'green':'red'}">${soldeDuJour>=0?'+':''}${formatCFA(soldeDuJour)}</div></div>
+      <div class="kpi"><div class="label">Dons</div><div class="val gold">${totalDons>0?formatCFA(totalDons):`${dons.length} don(s)`}</div></div>
+      <div class="kpi"><div class="label">Sorties</div><div class="val blue">${fiches.length}</div></div>
+    </div>
 
-    <h2>Dépenses (${depenses.length})</h2>
-    ${depenses.length ? tableRows(['Libellé','Camp','Catégorie','Montant','Référence'], depenses.map(d => [
-      d.libelle,
-      d.camp?.nom || '—',
-      d.categorie,
-      `<span class="red" style="font-weight:600">-${formatCFA(Number(d.montant))}</span>`,
-      d.reference || '—'
-    ])) : '<p class="empty">Aucune dépense ce jour.</p>'}
+    <h2><span class="ico">👥</span> Équipe d'encadrement (${animateurs.length})</h2>
+    ${animateurs.length ? `<div class="animateurs-grid">${animCards}</div>` : '<p class="empty">Aucun animateur enregistré pour ce camp.</p>'}
 
-    <h2>Sorties / Présence (${fiches.length})</h2>
-    ${fiches.length ? tableRows(['Nom','Type','H. Sortie','Motif','H. Retour','Statut'], fiches.map(f => [
-      `${f.prenom} ${f.nom}`,
-      f.type === 'ANIMATEUR' ? 'Encadrant' : 'Enfant',
-      fmt(f.heureSortie),
-      f.motif,
-      f.heureRetour ? fmt(f.heureRetour) : '—',
-      f.heureRetour ? '<span class="green">Retour</span>' : '<span class="red">Absent</span>'
-    ])) : '<p class="empty">Aucune sortie enregistrée ce jour.</p>'}
+    <h2><span class="ico">🏷️</span> Groupes du camp (${groupes.length})</h2>
+    ${tbl(['Groupe','Animateur responsable','Participants','Description'], groupeRows, 'Aucun groupe créé.')}
 
-    <h2>Visiteurs (${visiteurs.length})</h2>
-    ${visiteurs.length ? tableRows(['Nom','Téléphone','Qualité/Fonction'], visiteurs.map(v => [
-      `${v.prenom} ${v.nom}`, v.telephone, v.qualite
-    ])) : '<p class="empty">Aucun visiteur ce jour.</p>'}
-
-    <h2>Dons reçus (${dons.length})</h2>
-    ${dons.length ? tableRows(['Donateur','Téléphone','Description','Montant'], dons.map(d => [
-      `${d.prenom} ${d.nom}`,
-      d.telephone,
-      d.description,
-      d.montant && Number(d.montant) > 0 ? `<span class="gold" style="font-weight:600">${formatCFA(Number(d.montant))}</span>` : 'En nature'
-    ])) : '<p class="empty">Aucun don ce jour.</p>'}
-
-    <h2>Activités planifiées ce jour (${activites.length})</h2>
-    ${activites.length ? tableRows(['Titre','Horaires','Statut'], activites.map(a => [
-      a.titre,
+    <h2><span class="ico">🗓️</span> Activités du jour (${activites.length})</h2>
+    ${tbl(['Titre','Lieu','Horaires','Statut'], activites.map(a=>[
+      a.titre, a.lieu||'—',
       `${fmt(a.dateHeureDebut)} — ${fmt(a.dateHeureFin)}`,
       a.statut
-    ])) : '<p class="empty">Aucune activité planifiée ce jour.</p>'}
+    ]), 'Aucune activité planifiée ce jour.')}
 
-    <footer>Généré le ${new Date().toLocaleString('fr-FR')} &mdash; Camp Manager</footer>
+    <h2><span class="ico">🚶</span> Sorties / Présence (${fiches.length})</h2>
+    ${tbl(['Nom','Type','Heure sortie','Motif','Heure retour','Statut'], fiches.map(f=>[
+      `${f.prenom} ${f.nom}`,
+      f.type==='ANIMATEUR'?'Encadrant':'Enfant',
+      fmt(f.heureSortie), f.motif,
+      f.heureRetour?fmt(f.heureRetour):'—',
+      f.heureRetour?'<span class="green">✓ Retour</span>':'<span class="red">⚠ Absent</span>'
+    ]), 'Aucune sortie enregistrée ce jour.')}
+
+    <h2><span class="ico">💰</span> Encaissements (${paiements.length})</h2>
+    ${tbl(['Participant','Camp','Mode','Montant'], paiements.map(p=>[
+      `${p.participant.prenom} ${p.participant.nom}`,
+      p.participant.camp?.nom||'—',
+      METHODES[p.methode]||p.methode,
+      `<span class="green" style="font-weight:700">+${formatCFA(Number(p.montant))}</span>`
+    ]), 'Aucun encaissement ce jour.')}
+    ${paiements.length?`<table><tbody><tr class="total-row"><td colspan="3">Total encaissé</td><td class="green">+${formatCFA(totalEncaisse)}</td></tr></tbody></table>`:''}
+
+    <h2><span class="ico">💸</span> Dépenses (${depenses.length})</h2>
+    ${tbl(['Libellé','Catégorie','Camp','Montant'], depenses.map(d=>[
+      d.libelle, d.categorie, d.camp?.nom||'—',
+      `<span class="red" style="font-weight:700">-${formatCFA(Number(d.montant))}</span>`
+    ]), 'Aucune dépense ce jour.')}
+    ${depenses.length?`<table><tbody><tr class="total-row"><td colspan="3">Total dépensé</td><td class="red">-${formatCFA(totalDepenses)}</td></tr></tbody></table>`:''}
+
+    <h2><span class="ico">🎁</span> Dons reçus (${dons.length})</h2>
+    ${tbl(['Donateur','Téléphone','Description','Montant'], dons.map(d=>[
+      `${d.prenom} ${d.nom}`, d.telephone, d.description,
+      d.montant&&Number(d.montant)>0?`<span class="gold" style="font-weight:700">${formatCFA(Number(d.montant))}</span>`:'En nature'
+    ]), 'Aucun don ce jour.')}
+
+    <h2><span class="ico">🧑‍🤝‍🧑</span> Visiteurs (${visiteurs.length})</h2>
+    ${tbl(['Nom','Téléphone','Qualité/Fonction'], visiteurs.map(v=>[
+      `${v.prenom} ${v.nom}`, v.telephone, v.qualite
+    ]), 'Aucun visiteur ce jour.')}
+
+    <div style="margin-top:20px;border:2px solid ${soldeDuJour>=0?'#16a34a':'#dc2626'};border-radius:12px;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;background:${soldeDuJour>=0?'#f0fdf4':'#fef2f2'}">
+      <div>
+        <div style="font-weight:700;font-size:13px">Solde net de la journée</div>
+        <div style="font-size:11px;color:#64748b">Encaissements − Dépenses</div>
+      </div>
+      <div style="font-size:24px;font-weight:800;color:${soldeDuJour>=0?'#16a34a':'#dc2626'}">${soldeDuJour>=0?'+':''}${formatCFA(soldeDuJour)}</div>
+    </div>
+
+    <footer>
+      <span>Camp Manager &mdash; Rapport ${periode}</span>
+      <span>Généré le ${new Date().toLocaleString('fr-FR')}</span>
+    </footer>
     <script>window.onload=()=>{window.print()}<\/script>
     </body></html>`)
     win.document.close()
@@ -217,6 +295,16 @@ export default function RapportPage() {
           <p className="text-sm text-ink-3">Synthèse des activités sur une période</p>
         </div>
         <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex items-center gap-1.5 relative">
+            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-ink-3" />
+            <select
+              className="input-field pr-7 appearance-none"
+              value={campId}
+              onChange={e => setCampId(e.target.value)}
+            >
+              {camps.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+            </select>
+          </div>
           <div className="flex items-center gap-1.5">
             <label className="text-xs text-ink-3 shrink-0">Du</label>
             <input type="date" className="input-field w-auto" value={dateDebut} max={today}
@@ -272,6 +360,56 @@ export default function RapportPage() {
           </div>
         </div>
       </div>
+
+      {/* Équipe & Groupes du camp sélectionné */}
+      {(animateurs.length > 0 || groupes.length > 0) && (
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Section title="Équipe d'encadrement" icon={Users} color="sage" count={animateurs.length}>
+            {animateurs.length === 0 ? (
+              <p className="px-5 py-4 text-sm text-ink-3 italic">Aucun animateur enregistré.</p>
+            ) : (
+              <div className="divide-y divide-border">
+                {animateurs.map(a => (
+                  <div key={a.id} className="px-5 py-3">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <p className="font-semibold text-sm text-ink">{a.prenom} {a.nom}</p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${a.statut === 'ACTIF' ? 'bg-sage/10 text-sage' : 'bg-muted text-ink-3'}`}>{a.statut}</span>
+                    </div>
+                    {a.specialite && <p className="text-xs text-ink-3 mb-1">{a.specialite}{a.telephone ? ` · ${a.telephone}` : ''}</p>}
+                    {a.missions && (
+                      <div className="flex items-start gap-1.5 mt-1.5 bg-surface rounded-lg px-3 py-2">
+                        <BookOpen size={12} className="text-ink-3 mt-0.5 shrink-0" />
+                        <p className="text-xs text-ink-2 whitespace-pre-wrap">{a.missions}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+
+          <Section title="Groupes" icon={Users} color="sky" count={groupes.length}>
+            {groupes.length === 0 ? (
+              <p className="px-5 py-4 text-sm text-ink-3 italic">Aucun groupe créé.</p>
+            ) : (
+              <div className="divide-y divide-border">
+                {groupes.map(g => (
+                  <div key={g.id} className="flex items-center gap-3 px-5 py-3">
+                    <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: g.couleur }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm text-ink">{g.nom}</p>
+                      <p className="text-xs text-ink-3">
+                        {g.animateur ? `${g.animateur.prenom} ${g.animateur.nom}` : 'Sans animateur'}
+                        {' · '}{g._count?.participants ?? 0} participant(s)
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+        </div>
+      )}
 
       {loading && (
         <div className="card flex items-center justify-center py-12 text-ink-3 gap-3">
