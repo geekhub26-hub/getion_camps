@@ -1,5 +1,6 @@
 import 'dotenv/config'
 import express from 'express'
+import { initAdmin } from './scripts/initAdmin'
 import cors from 'cors'
 import helmet from 'helmet'
 import morgan from 'morgan'
@@ -100,6 +101,7 @@ app.listen(PORT, () => {
   console.log(`   Environnement : ${process.env.NODE_ENV || 'development'}`)
   console.log(`   URL           : http://localhost:${PORT}`)
   console.log(`   Health        : http://localhost:${PORT}/health\n`)
+  initAdmin()
 })
 
 export default app
