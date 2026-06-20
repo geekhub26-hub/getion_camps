@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "build": "cd frond && npm install && npm run build && cd ../camp-manager-backend/backend && npm install && npm run build && npx prisma generate",
-    "start": "cd camp-manager-backend/backend && npm start",
+    "start": "cd camp-manager-backend/backend && npx prisma migrate deploy && npm start",
     "dev:back": "cd camp-manager-backend/backend && npm run dev",
     "dev:front": "cd frond && npm run dev"
   }
