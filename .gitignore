@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
+frond/dist/
+frond/.tsbuildinfo
+frond/tsconfig.tsbuildinfo
+frond/tsconfig.node.tsbuildinfo
+camp-manager-backend/backend/dist/
+camp-manager-backend/backend/public/
+camp-manager-backend/backend/uploads/
