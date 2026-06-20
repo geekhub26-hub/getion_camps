@@ -192,6 +192,15 @@ export function CampFormPage() {
   )
 }
 
+const STATUTS_CAMP = [
+  { value: 'BROUILLON', label: 'Brouillon' },
+  { value: 'OUVERT', label: 'Ouvert' },
+  { value: 'EN_COURS', label: 'En cours' },
+  { value: 'COMPLET', label: 'Complet' },
+  { value: 'TERMINE', label: 'Terminé' },
+  { value: 'ANNULE', label: 'Annulé' },
+]
+
 export function CampDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -201,6 +210,10 @@ export function CampDetailPage() {
   const [paroisses, setParoisses] = useState<CampParoisse[]>([])
   const [paroisseForm, setParoisseForm] = useState({ nom: '', responsable: '', telephone: '' })
   const [paroisseError, setParoisseError] = useState('')
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editForm, setEditForm] = useState({ ...emptyCamp, statut: 'OUVERT' as string })
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState('')
 
   const loadParoisses = () => {
     if (!id) return
@@ -222,6 +235,39 @@ export function CampDetailPage() {
     if (!id || !window.confirm('Supprimer ce camp et ses données associées ?')) return
     await api.delete(`/camps/${id}`)
     navigate('/camps')
+  }
+
+  const openEdit = () => {
+    if (!camp) return
+    setEditForm({
+      nom: camp.nom,
+      description: camp.description ?? '',
+      lieu: camp.lieu,
+      adresse: camp.adresse ?? '',
+      dateDebut: camp.dateDebut.slice(0, 10),
+      dateFin: camp.dateFin.slice(0, 10),
+      capaciteMax: camp.capaciteMax,
+      prixBase: Number(camp.prixBase),
+      statut: camp.statut,
+    })
+    setEditError('')
+    setShowEditModal(true)
+  }
+
+  const saveEdit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!id) return
+    setEditSaving(true)
+    setEditError('')
+    try {
+      const { data } = await api.put<ApiOne<Camp>>(`/camps/${id}`, editForm)
+      setCamp(data.data)
+      setShowEditModal(false)
+    } catch (err) {
+      setEditError(getErrorMessage(err))
+    } finally {
+      setEditSaving(false)
+    }
   }
 
   const addParoisse = async (e: FormEvent) => {
@@ -252,7 +298,12 @@ export function CampDetailPage() {
       <PageHeader
         title={camp.nom}
         subtitle={`${camp.lieu} · ${formatDate(camp.dateDebut)} au ${formatDate(camp.dateFin)}`}
-        action={<button onClick={deleteCamp} className="btn-danger inline-flex items-center gap-2"><Trash2 size={16} /> Supprimer</button>}
+        action={
+          <div className="flex gap-2">
+            <button onClick={openEdit} className="btn-ghost inline-flex items-center gap-2"><Pencil size={16} /> Modifier</button>
+            <button onClick={deleteCamp} className="btn-danger inline-flex items-center gap-2"><Trash2 size={16} /> Supprimer</button>
+          </div>
+        }
       />
       <div className="grid sm:grid-cols-4 gap-4">
         <div className="card"><p className="text-xs text-ink-3">Statut</p><span className={statutCampBadge[camp.statut as StatutCamp]}>{statutCampLabel[camp.statut as StatutCamp]}</span></div>
@@ -300,6 +351,58 @@ export function CampDetailPage() {
         <Link className="btn-ghost inline-flex justify-center items-center gap-2" to="/planning"><Calendar size={16} /> Planifier activité</Link>
         <Link className="btn-ghost inline-flex justify-center items-center gap-2" to="/paiements"><CreditCard size={16} /> Suivre paiements</Link>
       </div>
+
+      {/* ── Modal édition camp ─────────────────────────────────── */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <h2 className="font-display font-700 text-lg">Modifier le camp</h2>
+              <button onClick={() => setShowEditModal(false)} className="p-1.5 rounded-lg hover:bg-surface text-ink-3 hover:text-ink transition-colors"><X size={18} /></button>
+            </div>
+            <form onSubmit={saveEdit} className="p-6 space-y-4">
+              {editError && <div className="rounded-xl border border-ember/20 bg-ember/10 px-3 py-2 text-sm text-ember">{editError}</div>}
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Field label="Nom du camp">
+                  <input className="input-field" required value={editForm.nom} onChange={e => setEditForm(f => ({ ...f, nom: e.target.value }))} />
+                </Field>
+                <Field label="Lieu">
+                  <input className="input-field" required value={editForm.lieu} onChange={e => setEditForm(f => ({ ...f, lieu: e.target.value }))} />
+                </Field>
+                <Field label="Date début">
+                  <input type="date" className="input-field" required value={editForm.dateDebut} onChange={e => setEditForm(f => ({ ...f, dateDebut: e.target.value }))} />
+                </Field>
+                <Field label="Date fin">
+                  <input type="date" className="input-field" required value={editForm.dateFin} onChange={e => setEditForm(f => ({ ...f, dateFin: e.target.value }))} />
+                </Field>
+                <Field label="Capacité">
+                  <input type="number" min={1} className="input-field" required value={editForm.capaciteMax} onChange={e => setEditForm(f => ({ ...f, capaciteMax: Number(e.target.value) }))} />
+                </Field>
+                <Field label="Prix de base (FCFA)">
+                  <input type="number" min={0} className="input-field" required value={editForm.prixBase} onChange={e => setEditForm(f => ({ ...f, prixBase: Number(e.target.value) }))} />
+                </Field>
+                <Field label="Statut">
+                  <select className="input-field" value={editForm.statut} onChange={e => setEditForm(f => ({ ...f, statut: e.target.value }))}>
+                    {STATUTS_CAMP.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  </select>
+                </Field>
+                <Field label="Adresse">
+                  <input className="input-field" value={editForm.adresse} onChange={e => setEditForm(f => ({ ...f, adresse: e.target.value }))} />
+                </Field>
+              </div>
+              <Field label="Description">
+                <textarea className="input-field min-h-20" value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} />
+              </Field>
+              <div className="flex gap-3 justify-end pt-2">
+                <button type="button" onClick={() => setShowEditModal(false)} className="btn-ghost">Annuler</button>
+                <button type="submit" disabled={editSaving} className="btn-primary inline-flex items-center gap-2">
+                  <Save size={15} />{editSaving ? 'Enregistrement...' : 'Enregistrer'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
