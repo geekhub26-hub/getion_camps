@@ -450,6 +450,12 @@ export function ParticipantsPage() {
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
 
+  // Fouille des sacs
+  type ArticleSac = { id: string; article: string; quantite: number; categorie: string | null; confisque: boolean; notes: string | null }
+  const [articlesSac, setArticlesSac] = useState<ArticleSac[]>([])
+  const [articleForm, setArticleForm] = useState({ article: '', quantite: 1, categorie: '', confisque: false, notes: '' })
+  const [articleSaving, setArticleSaving] = useState(false)
+
   useEffect(() => { if (!campId && camps[0]) setCampId(camps[0].id) }, [camps, campId])
   useEffect(() => {
     const camp = camps.find(c => c.id === campId)
@@ -722,15 +728,50 @@ export function ParticipantsPage() {
     } catch { alert('Erreur lors de la suppression.') }
   }
 
+  const loadArticlesSac = async (participantId: string) => {
+    try {
+      const { data } = await api.get<{ data: ArticleSac[] }>(`/participants/${participantId}/articles-sac`)
+      setArticlesSac(data.data || [])
+    } catch { setArticlesSac([]) }
+  }
+
   const openParticipant = async (p: Participant) => {
+    setArticlesSac([])
+    setArticleForm({ article: '', quantite: 1, categorie: '', confisque: false, notes: '' })
     try {
       const { data } = await api.get<ApiOne<Participant>>(`/participants/${p.id}`)
       setViewP(data.data)
       setEditMode(false)
       setEditError('')
+      loadArticlesSac(p.id)
     } catch {
-      setViewP(p) // fallback to list data
+      setViewP(p)
+      loadArticlesSac(p.id)
     }
+  }
+
+  const addArticleSac = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!viewP || !articleForm.article.trim()) return
+    setArticleSaving(true)
+    try {
+      await api.post(`/participants/${viewP.id}/articles-sac`, articleForm)
+      setArticleForm({ article: '', quantite: 1, categorie: '', confisque: false, notes: '' })
+      loadArticlesSac(viewP.id)
+    } catch { /* silent */ }
+    setArticleSaving(false)
+  }
+
+  const deleteArticleSac = async (id: string) => {
+    if (!viewP) return
+    await api.delete(`/participants/${viewP.id}/articles-sac/${id}`)
+    loadArticlesSac(viewP.id)
+  }
+
+  const toggleConfisque = async (a: ArticleSac) => {
+    if (!viewP) return
+    await api.put(`/participants/${viewP.id}/articles-sac/${a.id}`, { confisque: !a.confisque })
+    loadArticlesSac(viewP.id)
   }
 
   const startEdit = (p: Participant) => {
@@ -1250,6 +1291,74 @@ export function ParticipantsPage() {
                       {viewP.parents[0].email && <p className="text-xs text-ink-3">{viewP.parents[0].email}</p>}
                     </div>
                   )}
+                </div>
+
+                {/* ── Fouille des sacs ───────────────────────── */}
+                <div className="rounded-xl bg-surface border border-border p-3 space-y-3 sm:col-span-2">
+                  <p className="text-xs font-semibold text-ink-3 uppercase tracking-wide">Fouille des bagages</p>
+
+                  {/* Liste des articles */}
+                  {articlesSac.length > 0 && (
+                    <div className="space-y-1.5">
+                      {articlesSac.map(a => (
+                        <div key={a.id} className={`flex items-center gap-2 rounded-lg px-3 py-2 border text-sm ${a.confisque ? 'bg-ember/5 border-ember/20' : 'bg-card border-border'}`}>
+                          <div className="flex-1 min-w-0">
+                            <span className="font-medium">{a.article}</span>
+                            {a.quantite > 1 && <span className="text-ink-3 ml-1">×{a.quantite}</span>}
+                            {a.categorie && <span className="ml-2 text-xs text-ink-3 bg-surface border border-border rounded px-1.5 py-0.5">{a.categorie}</span>}
+                            {a.confisque && <span className="ml-2 text-xs text-ember font-medium">Confisqué</span>}
+                            {a.notes && <p className="text-xs text-ink-3 mt-0.5">{a.notes}</p>}
+                          </div>
+                          <button onClick={() => toggleConfisque(a)} title={a.confisque ? 'Rendre' : 'Confisquer'} className={`p-1.5 rounded-lg transition-colors text-xs ${a.confisque ? 'text-ember hover:bg-ember/10' : 'text-ink-3 hover:bg-surface'}`}>
+                            {a.confisque ? <X size={13} /> : <Check size={13} />}
+                          </button>
+                          <button onClick={() => deleteArticleSac(a.id)} className="p-1.5 rounded-lg text-ink-3 hover:text-ember hover:bg-ember/5 transition-colors">
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Formulaire d'ajout */}
+                  <form onSubmit={addArticleSac} className="space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        className="input-field flex-1 text-sm py-2"
+                        placeholder="Article / objet *"
+                        value={articleForm.article}
+                        onChange={e => setArticleForm(f => ({ ...f, article: e.target.value }))}
+                        required
+                      />
+                      <input
+                        type="number" min={1}
+                        className="input-field w-16 text-sm py-2"
+                        value={articleForm.quantite}
+                        onChange={e => setArticleForm(f => ({ ...f, quantite: Number(e.target.value) }))}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        className="input-field flex-1 text-sm py-2"
+                        placeholder="Catégorie (ex: Médicaments, Électronique...)"
+                        value={articleForm.categorie}
+                        onChange={e => setArticleForm(f => ({ ...f, categorie: e.target.value }))}
+                      />
+                      <label className="flex items-center gap-1.5 text-xs text-ink-2 whitespace-nowrap cursor-pointer">
+                        <input type="checkbox" checked={articleForm.confisque} onChange={e => setArticleForm(f => ({ ...f, confisque: e.target.checked }))} className="rounded" />
+                        Confisqué
+                      </label>
+                    </div>
+                    <input
+                      className="input-field text-sm py-2"
+                      placeholder="Notes"
+                      value={articleForm.notes}
+                      onChange={e => setArticleForm(f => ({ ...f, notes: e.target.value }))}
+                    />
+                    <button type="submit" disabled={articleSaving} className="btn-ghost w-full text-sm py-2 flex items-center justify-center gap-2">
+                      <Plus size={14} /> {articleSaving ? 'Ajout...' : 'Ajouter un article'}
+                    </button>
+                  </form>
                 </div>
 
                 <div className="flex gap-3 pt-2 pb-1">

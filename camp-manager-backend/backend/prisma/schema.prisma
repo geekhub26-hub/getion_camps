@@ -212,6 +212,7 @@ model Participant {
   paiements   Paiement[]
   documents   Document[]
   groupes     ParticipantGroupe[]
+  articlesSac ArticleSac[]
 
   @@map("participants")
 }
@@ -530,6 +531,25 @@ model Visiteur {
 // ─────────────────────────────────────────
 //  DON — Registre des dons reçus
 // ─────────────────────────────────────────
+
+// ─────────────────────────────────────────
+//  ARTICLE SAC — Fouille des bagages
+// ─────────────────────────────────────────
+
+model ArticleSac {
+  id            String   @id @default(uuid())
+  participantId String   @map("participant_id")
+  article       String
+  quantite      Int      @default(1)
+  categorie     String?
+  confisque     Boolean  @default(false)
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@map("articles_sac")
+}
 
 model Don {
   id          String   @id @default(uuid())
