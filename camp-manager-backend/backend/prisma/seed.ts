@@ -52,25 +52,6 @@ async function main() {
     } 
   })
   
-  const animUser1 = await prisma.user.create({ 
-    data: { 
-      nom: 'Mvondo', 
-      prenom: 'Jean-Paul', 
-      email: 'jeanpaul@camp.cm', 
-      motDePasseHash: await hash('Animateur1!'), 
-      role: Role.ANIMATEUR 
-    } 
-  })
-  
-  const animUser2 = await prisma.user.create({ 
-    data: { 
-      nom: 'Bella', 
-      prenom: 'Sophie', 
-      email: 'sophie@camp.cm', 
-      motDePasseHash: await hash('Animateur1!'), 
-      role: Role.ANIMATEUR 
-    } 
-  })
   console.log('   ✓ Utilisateurs créés')
 
   // ── Camp ─────────────────────────────────────────────────
@@ -90,22 +71,24 @@ async function main() {
   console.log('   ✓ Camp créé')
 
   // ── Animateurs ────────────────────────────────────────────
-  const anim1 = await prisma.animateur.create({ 
-    data: { 
-      userId: animUser1.id, 
-      campId: camp.id, 
-      specialite: 'Sports & Plein air', 
-      telephone: '+237600000001' 
-    } 
+  const anim1 = await prisma.animateur.create({
+    data: {
+      nom: 'Mvondo', prenom: 'Jean-Paul',
+      campId: camp.id,
+      specialite: 'Sports & Plein air',
+      telephone: '+237600000001',
+      missions: 'Encadrement des activités sportives et plein air',
+    }
   })
-  
-  const anim2 = await prisma.animateur.create({ 
-    data: { 
-      userId: animUser2.id, 
-      campId: camp.id, 
-      specialite: 'Arts & Créativité', 
-      telephone: '+237600000002' 
-    } 
+
+  const anim2 = await prisma.animateur.create({
+    data: {
+      nom: 'Bella', prenom: 'Sophie',
+      campId: camp.id,
+      specialite: 'Arts & Créativité',
+      telephone: '+237600000002',
+      missions: 'Animation des ateliers artistiques et créatifs',
+    }
   })
   console.log('   ✓ Animateurs créés')
 
