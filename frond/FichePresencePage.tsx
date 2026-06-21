@@ -69,6 +69,8 @@ export default function FichePresencePage() {
     setShowModal(true)
   }
 
+  const toUTC = (local: string) => local ? new Date(local).toISOString() : ''
+
   const save = async () => {
     if (!form.campIdForm || !form.nom || !form.prenom || !form.heureSortie || !form.motif) {
       setError('Veuillez remplir tous les champs obligatoires.'); return
@@ -76,7 +78,11 @@ export default function FichePresencePage() {
     setError(''); setSaving(true)
     try {
       const { campIdForm, ...rest } = form
-      await api.post('/fiches-presence', { ...rest, campId: campIdForm })
+      await api.post('/fiches-presence', {
+        ...rest,
+        heureSortie: toUTC(rest.heureSortie),
+        campId: campIdForm,
+      })
       setShowModal(false); load()
     } catch (err) { setError(getErrorMessage(err)) }
     finally { setSaving(false) }
@@ -90,7 +96,7 @@ export default function FichePresencePage() {
   const saveRetour = async () => {
     if (!showRetour) return
     await api.put(`/fiches-presence/${showRetour.id}`, {
-      heureRetour: retourForm.heureRetour,
+      heureRetour: toUTC(retourForm.heureRetour),
       signature: retourForm.signature || undefined,
     })
     setShowRetour(null); load()

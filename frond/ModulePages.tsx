@@ -1431,11 +1431,18 @@ export function PlanningPage() {
   }
   useEffect(load, [campId])
 
+  const toUTC = (local: string) => local ? new Date(local).toISOString() : ''
+
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     setPlanError('')
     try {
-      await api.post('/activites', { ...form, campId })
+      await api.post('/activites', {
+        ...form,
+        dateHeureDebut: toUTC(form.dateHeureDebut),
+        dateHeureFin: toUTC(form.dateHeureFin),
+        campId,
+      })
       setForm({ titre: '', description: '', lieu: '', dateHeureDebut: '', dateHeureFin: '', couleur: '#2563eb' })
       load()
     } catch (err) {
