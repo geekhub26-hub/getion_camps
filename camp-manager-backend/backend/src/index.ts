@@ -46,8 +46,9 @@ app.use('/api/auth', rateLimit({
 }))
 
 app.use(rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 200,
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 300,                 // 300 req/min par IP — suffisant pour usage interne
+  message: { success: false, message: 'Trop de requêtes, réessayez dans une minute' },
 }))
 
 // ─── Parsing & utilitaires ───────────────────────────────────
