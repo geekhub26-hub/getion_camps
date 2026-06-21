@@ -958,7 +958,20 @@ export function ParticipantsPage() {
               className="btn-ghost px-3 text-xs flex items-center gap-1"><X size={13} /> Effacer</button>
           )}
         </div>
-        <p className="text-xs text-ink-3">{filteredParticipants.length} résultat{filteredParticipants.length !== 1 ? 's' : ''} sur {participants.length}</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-xs text-ink-3">{filteredParticipants.length} résultat{filteredParticipants.length !== 1 ? 's' : ''} sur {participants.length}</p>
+          <span className="text-xs px-2.5 py-1 rounded-full bg-sky/10 text-sky font-medium">
+            {participants.filter(p => p.genre === 'Garçon').length} garçons
+          </span>
+          <span className="text-xs px-2.5 py-1 rounded-full bg-ember/10 text-ember font-medium">
+            {participants.filter(p => p.genre === 'Fille').length} filles
+          </span>
+          {participants.filter(p => !p.genre || (p.genre !== 'Garçon' && p.genre !== 'Fille')).length > 0 && (
+            <span className="text-xs px-2.5 py-1 rounded-full bg-muted/20 text-ink-3 font-medium">
+              {participants.filter(p => !p.genre || (p.genre !== 'Garçon' && p.genre !== 'Fille')).length} non renseigné
+            </span>
+          )}
+        </div>
         {participants.length === 0 ? <EmptyState icon={Users} title="Aucun participant" text="Cliquez sur « Inscrire » pour ajouter le premier participant." /> : (
           <div className="space-y-2">
             {filteredParticipants.map(p => (
