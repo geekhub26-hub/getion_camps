@@ -8,5 +8,5 @@ frond/.tsbuildinfo
 frond/tsconfig.tsbuildinfo
 frond/tsconfig.node.tsbuildinfo
 camp-manager-backend/backend/dist/
-camp-manager-backend/backend/public/
+# public/ committé manuellement après chaque build frontend
 camp-manager-backend/backend/uploads/

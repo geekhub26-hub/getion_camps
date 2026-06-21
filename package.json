@@ -2,7 +2,8 @@
   "name": "camp-manager",
   "version": "1.0.0",
   "scripts": {
-    "build": "cd frond && npm install && npx vite build && cd .. && mkdir -p camp-manager-backend/backend/public && cp -r frond/dist/. camp-manager-backend/backend/public/ && cd camp-manager-backend/backend && npm install --include=dev && npx prisma generate && npm run build",
+    "build": "cd camp-manager-backend/backend && npm install --include=dev && npx prisma generate && npm run build",
+    "build:full": "cd frond && npm install && npx vite build && cd ../.. && cp -r frond/dist/. camp-manager-backend/backend/public/ && cd camp-manager-backend/backend && npm install --include=dev && npx prisma generate && npm run build",
     "start": "cd camp-manager-backend/backend && npx prisma migrate deploy && npm start",
     "dev:back": "cd camp-manager-backend/backend && npm run dev",
     "dev:front": "cd frond && npm run dev"
