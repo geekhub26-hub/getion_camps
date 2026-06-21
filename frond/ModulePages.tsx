@@ -498,7 +498,15 @@ export function ParticipantsPage() {
       const key = `${p.nom.trim().toLowerCase()}|${p.prenom.trim().toLowerCase()}`
       map.set(key, [...(map.get(key) ?? []), p])
     })
-    return [...map.values()].filter(g => g.length > 1)
+    return [...map.values()]
+      .filter(g => g.length > 1)
+      .map(group => {
+        const dateKey = (p: Participant) => p.dateNaissance ? new Date(p.dateNaissance).toISOString().slice(0, 10) : ''
+        const dates = group.map(dateKey)
+        const certain = dates.some((d, i) => d && dates.some((d2, j) => j !== i && d === d2))
+        return { group, certain }
+      })
+      .sort((a, b) => Number(b.certain) - Number(a.certain))
   }, [participants])
 
   const [showDoublons, setShowDoublons] = useState(true)
@@ -899,7 +907,7 @@ export function ParticipantsPage() {
             <div className="flex items-center gap-2">
               <AlertTriangle size={16} className="text-amber-600 shrink-0" />
               <p className="font-semibold text-sm text-amber-800">
-                {doublons.length} doublon{doublons.length > 1 ? 's' : ''} détecté{doublons.length > 1 ? 's' : ''} — {doublons.reduce((n, g) => n + g.length, 0)} entrées concernées
+                {doublons.length} doublon{doublons.length > 1 ? 's' : ''} détecté{doublons.length > 1 ? 's' : ''} — {doublons.reduce((n, d) => n + d.group.length, 0)} entrées concernées
               </p>
             </div>
             <button onClick={() => setShowDoublons(v => !v)} className="text-xs text-amber-600 hover:text-amber-800">
@@ -908,25 +916,32 @@ export function ParticipantsPage() {
           </div>
           {showDoublons && (
             <div className="space-y-3">
-              {doublons.map(group => (
+              {doublons.map(({ group, certain }) => (
                 <div key={group[0].id} className="rounded-xl bg-white border border-amber-200 overflow-hidden">
-                  <div className="px-4 py-2 bg-amber-100 border-b border-amber-200">
+                  <div className="px-4 py-2 bg-amber-100 border-b border-amber-200 flex items-center justify-between">
                     <p className="font-semibold text-sm text-amber-900">{group[0].prenom} {group[0].nom}</p>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${certain ? 'bg-ember/15 text-ember' : 'bg-amber-200 text-amber-700'}`}>
+                      {certain ? 'Doublon certain' : 'Doublon possible'}
+                    </span>
                   </div>
-                  {group.map((p, i) => (
-                    <div key={p.id} className="flex items-center justify-between px-4 py-2.5 gap-3 border-b border-amber-100 last:border-0">
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-ink">#{i + 1} · {p.paroisse || 'Sans paroisse'}</p>
-                        <p className="text-xs text-ink-3">{formatDate(p.dateNaissance)} · {statutInscriptionLabel[p.statutInscription]}</p>
+                  <div className="grid divide-y divide-amber-100">
+                    {group.map((p, i) => (
+                      <div key={p.id} className="flex items-start justify-between px-4 py-3 gap-3">
+                        <div className="min-w-0 flex-1 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-0.5 text-xs">
+                          <div><span className="text-ink-3">Paroisse</span><br /><span className="font-medium text-ink">{p.paroisse || '—'}</span></div>
+                          <div><span className="text-ink-3">Né(e) le</span><br /><span className={`font-medium ${certain ? 'text-ember' : 'text-ink'}`}>{formatDate(p.dateNaissance)}</span></div>
+                          <div><span className="text-ink-3">Lieu</span><br /><span className="font-medium text-ink">{p.lieuNaissance || '—'}</span></div>
+                          <div><span className="text-ink-3">Statut</span><br /><span className="font-medium text-ink">{statutInscriptionLabel[p.statutInscription]}</span></div>
+                        </div>
+                        <button
+                          onClick={() => deleteParticipant(p.id, `${p.prenom} ${p.nom} (#${i + 1})`)}
+                          className="shrink-0 text-xs px-2.5 py-1.5 rounded-lg border border-ember/30 text-ember hover:bg-ember/5 flex items-center gap-1"
+                        >
+                          <Trash2 size={12} /> Supprimer
+                        </button>
                       </div>
-                      <button
-                        onClick={() => deleteParticipant(p.id, `${p.prenom} ${p.nom} (#${i + 1})`)}
-                        className="shrink-0 text-xs px-2.5 py-1.5 rounded-lg border border-ember/30 text-ember hover:bg-ember/5 flex items-center gap-1"
-                      >
-                        <Trash2 size={12} /> Supprimer
-                      </button>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
