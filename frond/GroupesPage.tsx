@@ -12,14 +12,25 @@ interface ParticipantMin {
 
 function matchesCategorie(p: ParticipantMin, categorie: string, refDate: Date): boolean {
   const cat = categorie.toLowerCase()
-  // Age range : "(10-12 ans)", "(13-15 ans)", etc.
-  const ageMatch = categorie.match(/\((\d+)-(\d+)\s*ans\)/i)
-  if (ageMatch && p.dateNaissance) {
+  const calcAge = (p: ParticipantMin): number | null => {
+    if (!p.dateNaissance) return null
     const birth = new Date(p.dateNaissance)
     let age = refDate.getUTCFullYear() - birth.getUTCFullYear()
     const m = refDate.getUTCMonth() - birth.getUTCMonth()
     if (m < 0 || (m === 0 && refDate.getUTCDate() < birth.getUTCDate())) age--
-    return age >= Number(ageMatch[1]) && age <= Number(ageMatch[2])
+    return age
+  }
+  // Âge précis : "12 ans", "(12 ans)"
+  const singleAge = categorie.match(/^\(?(\d+)\s*ans\)?$/i)
+  if (singleAge) {
+    const age = calcAge(p)
+    return age !== null && age === Number(singleAge[1])
+  }
+  // Tranche d'âge : "(10-12 ans)", "Juniors (10-12 ans)", etc.
+  const ageMatch = categorie.match(/\((\d+)-(\d+)\s*ans\)/i)
+  if (ageMatch) {
+    const age = calcAge(p)
+    return age !== null && age >= Number(ageMatch[1]) && age <= Number(ageMatch[2])
   }
   // Niveau scolaire
   if (!p.niveauScolaire) return false
@@ -312,15 +323,36 @@ export default function GroupesPage() {
               </Field>
 
               <Field label="Catégorie (tranche d'âge, classe…)">
-                <div className="space-y-2">
-                  <input className="input-field" placeholder="Ex : Juniors 10-12 ans, 6ème-5ème…" value={form.categorie} onChange={e => setForm({ ...form, categorie: e.target.value })} />
-                  <div className="flex flex-wrap gap-1.5">
-                    {['Juniors (10-12 ans)','Ados (13-15 ans)','Seniors (16-18 ans)','6ème-5ème','4ème-3ème','2nde-Tle'].map(c => (
-                      <button key={c} type="button" onClick={() => setForm({ ...form, categorie: c })}
-                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${form.categorie === c ? 'bg-sage text-white border-sage' : 'border-border text-ink-3 hover:border-sage hover:text-sage'}`}>
-                        {c}
-                      </button>
-                    ))}
+                <div className="space-y-2.5">
+                  <input className="input-field" placeholder="Ex : 12 ans, Juniors (10-12 ans), 6ème-5ème…" value={form.categorie} onChange={e => setForm({ ...form, categorie: e.target.value })} />
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-ink-3">Âge précis</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[10,11,12,13,14,15,16,17,18].map(a => (
+                        <button key={a} type="button" onClick={() => setForm({ ...form, categorie: `${a} ans` })}
+                          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${form.categorie === `${a} ans` ? 'bg-sage text-white border-sage' : 'border-border text-ink-3 hover:border-sage hover:text-sage'}`}>
+                          {a} ans
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-ink-3">Tranche d'âge</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {['Juniors (10-12 ans)','Ados (13-15 ans)','Seniors (16-18 ans)'].map(c => (
+                        <button key={c} type="button" onClick={() => setForm({ ...form, categorie: c })}
+                          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${form.categorie === c ? 'bg-sage text-white border-sage' : 'border-border text-ink-3 hover:border-sage hover:text-sage'}`}>
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-ink-3">Niveau scolaire</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {['6ème-5ème','4ème-3ème','2nde-Tle'].map(c => (
+                        <button key={c} type="button" onClick={() => setForm({ ...form, categorie: c })}
+                          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${form.categorie === c ? 'bg-sage text-white border-sage' : 'border-border text-ink-3 hover:border-sage hover:text-sage'}`}>
+                          {c}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </Field>
