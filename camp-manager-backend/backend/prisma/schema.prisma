@@ -273,6 +273,7 @@ model Groupe {
   campId      String   @map("camp_id")
   nom         String
   couleur     String   @default("#6366f1")
+  categorie   String?
   animateurId String?  @map("animateur_id")
   description String?
   createdAt   DateTime @default(now()) @map("created_at")

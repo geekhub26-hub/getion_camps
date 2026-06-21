@@ -8,6 +8,7 @@ router.use(authenticate)
 
 router.get('/', staffOnly, depense.getDepenses)
 router.post('/', staffOnly, depense.createDepense)
+router.put('/:id', adminOnly, depense.updateDepense)
 router.delete('/:id', adminOnly, depense.deleteDepense)
 
 export default router

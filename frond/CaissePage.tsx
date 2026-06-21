@@ -116,6 +116,8 @@ export default function CaissePage() {
   })
   const [editPayId, setEditPayId]     = useState<string | null>(null)
   const [editPayMontant, setEditPayMontant] = useState('')
+  const [editDepId, setEditDepId]     = useState<string | null>(null)
+  const [editDepForm, setEditDepForm] = useState({ libelle: '', categorie: 'Logistique', montant: '' })
   const todayISO = new Date().toISOString().slice(0, 10)
   const [showRapportModal, setShowRapportModal] = useState(false)
   const [rapportDebut, setRapportDebut] = useState(todayISO)
@@ -283,6 +285,20 @@ export default function CaissePage() {
       setTimeout(() => setPaySuccess(''), 5000)
     } catch (err) { setError(getError(err)) }
     finally { setSaving(false) }
+  }
+
+  const deleteDep = async (id: string) => {
+    if (!confirm('Supprimer cette dépense ?')) return
+    try { await api.delete(`/depenses/${id}`); load() }
+    catch (err) { setError(getError(err)) }
+  }
+
+  const saveEditDep = async (id: string) => {
+    if (!editDepForm.libelle || !editDepForm.montant) { setEditDepId(null); return }
+    try {
+      await api.put(`/depenses/${id}`, { libelle: editDepForm.libelle, categorie: editDepForm.categorie, montant: Number(editDepForm.montant) })
+      setEditDepId(null); load()
+    } catch (err) { setError(getError(err)) }
   }
 
   const deletePay = async (id: string) => {
@@ -567,28 +583,27 @@ export default function CaissePage() {
                 </div>
                 {editPayId === op.id ? (
                   <div className="flex items-center gap-2 shrink-0">
-                    <input
-                      type="number"
-                      min={1}
-                      value={editPayMontant}
-                      onChange={e => setEditPayMontant(e.target.value)}
-                      className="w-28 border border-border rounded-lg px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    />
-                    <button
-                      onClick={() => saveEditPay(op.id, op.participantId)}
-                      disabled={saving}
-                      className="p-1.5 rounded-lg bg-sage/15 text-sage hover:bg-sage/25 transition-colors"
-                      title="Enregistrer"
-                    >
-                      <Save size={14} />
-                    </button>
-                    <button
-                      onClick={() => setEditPayId(null)}
-                      className="p-1.5 rounded-lg bg-surface-2 text-ink-3 hover:bg-border transition-colors"
-                      title="Annuler"
-                    >
-                      <X size={14} />
-                    </button>
+                    <input type="number" min={1} value={editPayMontant} onChange={e => setEditPayMontant(e.target.value)}
+                      className="w-28 border border-border rounded-lg px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                    <button onClick={() => saveEditPay(op.id, op.participantId)} disabled={saving}
+                      className="p-1.5 rounded-lg bg-sage/15 text-sage hover:bg-sage/25 transition-colors" title="Enregistrer"><Save size={14} /></button>
+                    <button onClick={() => setEditPayId(null)}
+                      className="p-1.5 rounded-lg bg-surface text-ink-3 hover:bg-border transition-colors" title="Annuler"><X size={14} /></button>
+                  </div>
+                ) : editDepId === op.id ? (
+                  <div className="flex flex-col gap-1.5 shrink-0 w-64">
+                    <input className="border border-border rounded-lg px-2 py-1 text-sm focus:outline-none" placeholder="Libellé" value={editDepForm.libelle} onChange={e => setEditDepForm(f => ({ ...f, libelle: e.target.value }))} />
+                    <div className="flex gap-1.5">
+                      <select className="border border-border rounded-lg px-2 py-1 text-xs flex-1 focus:outline-none" value={editDepForm.categorie} onChange={e => setEditDepForm(f => ({ ...f, categorie: e.target.value }))}>
+                        {['Logistique','Alimentation','Activités','Transport','Matériel','Santé','Autre'].map(c => <option key={c}>{c}</option>)}
+                      </select>
+                      <input type="number" min={1} value={editDepForm.montant} onChange={e => setEditDepForm(f => ({ ...f, montant: e.target.value }))}
+                        className="border border-border rounded-lg px-2 py-1 text-sm w-24 text-right focus:outline-none" placeholder="Montant" />
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={() => saveEditDep(op.id)} className="flex-1 p-1 rounded-lg bg-sage/15 text-sage hover:bg-sage/25 text-xs flex items-center justify-center gap-1"><Save size={12} /> OK</button>
+                      <button onClick={() => setEditDepId(null)} className="flex-1 p-1 rounded-lg bg-surface text-ink-3 hover:bg-border text-xs flex items-center justify-center"><X size={12} /></button>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 shrink-0">
@@ -602,24 +617,23 @@ export default function CaissePage() {
                         </span>
                       )}
                     </div>
-                    {op.sign === '+' && (
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => { setEditPayId(op.id); setEditPayMontant(String(op.montant)) }}
-                          className="p-1.5 rounded-lg text-ink-3 hover:text-primary hover:bg-primary/10 transition-colors"
-                          title="Modifier le montant"
-                        >
-                          <Pencil size={13} />
-                        </button>
-                        <button
-                          onClick={() => deletePay(op.id)}
-                          className="p-1.5 rounded-lg text-ink-3 hover:text-ember hover:bg-ember/10 transition-colors"
-                          title="Supprimer ce paiement"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex gap-1">
+                      {op.sign === '+' ? (
+                        <>
+                          <button onClick={() => { setEditPayId(op.id); setEditPayMontant(String(op.montant)) }}
+                            className="p-1.5 rounded-lg text-ink-3 hover:text-primary hover:bg-primary/10 transition-colors" title="Modifier"><Pencil size={13} /></button>
+                          <button onClick={() => deletePay(op.id)}
+                            className="p-1.5 rounded-lg text-ink-3 hover:text-ember hover:bg-ember/10 transition-colors" title="Supprimer"><Trash2 size={13} /></button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => { setEditDepId(op.id); setEditDepForm({ libelle: op.label, categorie: op.detail, montant: String(op.montant) }) }}
+                            className="p-1.5 rounded-lg text-ink-3 hover:text-primary hover:bg-primary/10 transition-colors" title="Modifier la dépense"><Pencil size={13} /></button>
+                          <button onClick={() => deleteDep(op.id)}
+                            className="p-1.5 rounded-lg text-ink-3 hover:text-ember hover:bg-ember/10 transition-colors" title="Supprimer la dépense"><Trash2 size={13} /></button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

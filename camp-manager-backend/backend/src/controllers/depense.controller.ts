@@ -46,6 +46,28 @@ export const createDepense = async (req: AuthRequest, res: Response, next: NextF
   }
 }
 
+export const updateDepense = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const depense = await prisma.depense.findUnique({ where: { id: req.params.id } })
+    if (!depense) throw new AppError('Dépense introuvable', 404)
+    const { libelle, categorie, montant, reference, notes } = req.body
+    const updated = await prisma.depense.update({
+      where: { id: req.params.id },
+      data: {
+        libelle: libelle ?? depense.libelle,
+        categorie: categorie ?? depense.categorie,
+        montant: montant !== undefined ? Number(montant) : depense.montant,
+        reference: reference !== undefined ? (reference || null) : depense.reference,
+        notes: notes !== undefined ? (notes || null) : depense.notes,
+      },
+      include: { camp: { select: { id: true, nom: true } } },
+    })
+    sendSuccess(res, updated, 'Dépense mise à jour')
+  } catch (err) {
+    next(err)
+  }
+}
+
 export const deleteDepense = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const depense = await prisma.depense.findUnique({ where: { id: req.params.id } })

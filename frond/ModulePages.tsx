@@ -428,6 +428,8 @@ export function ParticipantsPage() {
   const [campPrice, setCampPrice] = useState(0)
   const [participants, setParticipants] = useState<Participant[]>([])
   const [search, setSearch] = useState('')
+  const [filterStatut, setFilterStatut] = useState('')
+  const [filterParoisse, setFilterParoisse] = useState('')
   const [saving, setSaving] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState('')
@@ -469,11 +471,26 @@ export function ParticipantsPage() {
 
   const load = () => {
     if (!campId) return
-    api.get<ApiList<Participant>>(`/camps/${campId}/participants?perPage=200&search=${encodeURIComponent(search)}`)
+    api.get<ApiList<Participant>>(`/camps/${campId}/participants?perPage=500`)
       .then(({ data }) => setParticipants(data.data || []))
       .catch(() => setParticipants([]))
   }
-  useEffect(load, [campId, search])
+  useEffect(load, [campId])
+
+  const filteredParticipants = useMemo(() => {
+    const q = search.toLowerCase().trim()
+    return participants.filter(p => {
+      if (q && !`${p.prenom} ${p.nom} ${p.paroisse || ''}`.toLowerCase().includes(q)) return false
+      if (filterStatut && p.statutInscription !== filterStatut) return false
+      if (filterParoisse && p.paroisse !== filterParoisse) return false
+      return true
+    })
+  }, [participants, search, filterStatut, filterParoisse])
+
+  const paroisseOptions = useMemo(() => {
+    const set = new Set(participants.map(p => p.paroisse).filter(Boolean) as string[])
+    return [...set].sort()
+  }, [participants])
 
   // Convert French label to Prisma RelationParent enum (PERE|MERE|TUTEUR|AUTRE)
   const toRelationEnum = (v: string): string => {
@@ -866,13 +883,33 @@ export function ParticipantsPage() {
       )}
 
       <div className="card space-y-4">
-        <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-3" />
-          <input className="input-field pl-9" placeholder="Rechercher un participant..." value={search} onChange={e => setSearch(e.target.value)} />
+        {/* Barre de recherche + filtres */}
+        <div className="flex flex-wrap gap-2">
+          <div className="relative flex-1 min-w-48">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-3" />
+            <input className="input-field pl-9 w-full" placeholder="Nom, prénom, paroisse…" value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+          <select className="input-field w-auto" value={filterStatut} onChange={e => setFilterStatut(e.target.value)}>
+            <option value="">Tous les statuts</option>
+            <option value="EN_ATTENTE">En attente</option>
+            <option value="CONFIRME">Confirmé</option>
+            <option value="ANNULE">Annulé</option>
+          </select>
+          {paroisseOptions.length > 0 && (
+            <select className="input-field w-auto" value={filterParoisse} onChange={e => setFilterParoisse(e.target.value)}>
+              <option value="">Toutes les paroisses</option>
+              {paroisseOptions.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          )}
+          {(search || filterStatut || filterParoisse) && (
+            <button onClick={() => { setSearch(''); setFilterStatut(''); setFilterParoisse('') }}
+              className="btn-ghost px-3 text-xs flex items-center gap-1"><X size={13} /> Effacer</button>
+          )}
         </div>
+        <p className="text-xs text-ink-3">{filteredParticipants.length} résultat{filteredParticipants.length !== 1 ? 's' : ''} sur {participants.length}</p>
         {participants.length === 0 ? <EmptyState icon={Users} title="Aucun participant" text="Cliquez sur « Inscrire » pour ajouter le premier participant." /> : (
           <div className="space-y-2">
-            {participants.map(p => (
+            {filteredParticipants.map(p => (
               <div key={p.id} className="rounded-xl border border-border bg-surface px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 justify-between hover:border-sage/30 transition-colors">
                 <button className="text-left flex-1 min-w-0" onClick={() => openParticipant(p)}>
                   <p className="font-medium text-sm">{p.prenom} {p.nom}</p>

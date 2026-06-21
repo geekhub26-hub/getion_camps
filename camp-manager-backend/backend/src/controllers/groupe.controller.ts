@@ -73,7 +73,7 @@ export const getGroupeById = async (req: AuthRequest, res: Response, next: NextF
 export const createGroupe = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { campId } = req.params
-    const { nom, couleur, animateurId, description } = req.body
+    const { nom, couleur, categorie, animateurId, description } = req.body
 
     // Vérifier que le camp existe
     const camp = await prisma.camp.findUnique({ where: { id: campId } })
@@ -90,6 +90,7 @@ export const createGroupe = async (req: AuthRequest, res: Response, next: NextFu
         campId,
         nom,
         couleur: couleur || '#6366f1',
+        categorie: categorie || null,
         animateurId: animateurId || null,
         description,
       },
@@ -120,6 +121,7 @@ export const updateGroupe = async (req: AuthRequest, res: Response, next: NextFu
       data: {
         nom: req.body.nom,
         couleur: req.body.couleur,
+        categorie: req.body.categorie !== undefined ? (req.body.categorie || null) : undefined,
         animateurId: req.body.animateurId || null,
         description: req.body.description,
       },

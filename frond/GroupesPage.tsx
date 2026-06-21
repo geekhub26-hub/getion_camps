@@ -8,6 +8,7 @@ interface Groupe {
   id: string
   nom: string
   couleur: string
+  categorie: string | null
   animateurId: string | null
   description: string | null
   campId: string
@@ -73,6 +74,9 @@ function GroupeCard({ groupe, onDelete, onEdit }: {
             <p className="text-xs text-ink-3">
               {groupe.animateur ? `${groupe.animateur.prenom} ${groupe.animateur.nom}` : 'Animateur non assigné'}
             </p>
+            {groupe.categorie && (
+              <span className="mt-0.5 inline-block text-xs px-2 py-0.5 rounded-full bg-surface border border-border text-ink-3">{groupe.categorie}</span>
+            )}
           </div>
         </div>
         <div className="flex gap-1">
@@ -121,6 +125,7 @@ export default function GroupesPage() {
   const [form, setForm] = useState({
     nom: '',
     couleur: '#7eb87a',
+    categorie: '',
     animateurId: '',
     description: ''
   })
@@ -171,7 +176,7 @@ export default function GroupesPage() {
       }
       setShowForm(false)
       setEditing(null)
-      setForm({ nom: '', couleur: '#7eb87a', animateurId: '', description: '' })
+      setForm({ nom: '', couleur: '#7eb87a', categorie: '', animateurId: '', description: '' })
       loadGroupes()
     } catch (err) {
       console.error('Erreur:', err)
@@ -189,6 +194,7 @@ export default function GroupesPage() {
     setForm({
       nom: groupe.nom,
       couleur: groupe.couleur,
+      categorie: groupe.categorie || '',
       animateurId: groupe.animateurId || '',
       description: groupe.description || ''
     })
@@ -217,7 +223,7 @@ export default function GroupesPage() {
               ))}
             </select>
             <button 
-              onClick={() => { setShowForm(true); setEditing(null); setForm({ nom: '', couleur: '#7eb87a', animateurId: '', description: '' }) }}
+              onClick={() => { setShowForm(true); setEditing(null); setForm({ nom: '', couleur: '#7eb87a', categorie: '', animateurId: '', description: '' }) }}
               className="btn-primary flex items-center gap-2"
             >
               <Plus size={16} /> Nouveau groupe
@@ -253,6 +259,20 @@ export default function GroupesPage() {
                     />
                   ))}
                   <input type="color" value={form.couleur} onChange={e => setForm({ ...form, couleur: e.target.value })} className="w-8 h-8 rounded border border-border" />
+                </div>
+              </Field>
+
+              <Field label="Catégorie (tranche d'âge, classe…)">
+                <div className="space-y-2">
+                  <input className="input-field" placeholder="Ex : Juniors 10-12 ans, 6ème-5ème…" value={form.categorie} onChange={e => setForm({ ...form, categorie: e.target.value })} />
+                  <div className="flex flex-wrap gap-1.5">
+                    {['Juniors (10-12 ans)','Ados (13-15 ans)','Seniors (16-18 ans)','6ème-5ème','4ème-3ème','2nde-Tle'].map(c => (
+                      <button key={c} type="button" onClick={() => setForm({ ...form, categorie: c })}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${form.categorie === c ? 'bg-sage text-white border-sage' : 'border-border text-ink-3 hover:border-sage hover:text-sage'}`}>
+                        {c}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </Field>
 
