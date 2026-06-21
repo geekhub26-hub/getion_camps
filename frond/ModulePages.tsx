@@ -1592,6 +1592,7 @@ export function MedicalPage() {
   const { camps } = useCamps()
   const [campId, setCampId] = useState('')
   const [participants, setParticipants] = useState<Participant[]>([])
+  const [search, setSearch] = useState('')
   const [editingId, setEditingId] = useState('')
   const [form, setForm] = useState({ groupeSanguin: '', allergies: '', medicaments: '', infosMedicales: '', nomUrgence: '', telephoneUrgence: '' })
 
@@ -1599,12 +1600,19 @@ export function MedicalPage() {
 
   const load = () => {
     if (!campId) return
-    api.get<ApiList<Participant>>(`/camps/${campId}/participants?perPage=100`)
+    api.get<ApiList<Participant>>(`/camps/${campId}/participants?perPage=500`)
       .then(({ data }) => setParticipants(data.data || []))
       .catch(() => setParticipants([]))
   }
 
   useEffect(load, [campId])
+
+  const filteredMedical = useMemo(() => {
+    const q = search.toLowerCase().trim()
+    return participants
+      .filter(p => !q || `${p.prenom} ${p.nom}`.toLowerCase().includes(q))
+      .sort((a, b) => a.nom.localeCompare(b.nom, 'fr') || a.prenom.localeCompare(b.prenom, 'fr'))
+  }, [participants, search])
 
   const startEdit = (p: Participant) => {
     setEditingId(p.id)
@@ -1629,11 +1637,20 @@ export function MedicalPage() {
       <PageHeader
         title="Médical"
         subtitle="Allergies, traitements, contacts d'urgence et notes de santé."
-        action={<select className="input-field w-full sm:w-72" value={campId} onChange={e => setCampId(e.target.value)}>{camps.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}</select>}
+        action={
+          <div className="flex flex-wrap gap-2">
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-3" />
+              <input className="input-field pl-8 w-48" placeholder="Nom, prénom…" value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+            <select className="input-field w-full sm:w-56" value={campId} onChange={e => setCampId(e.target.value)}>{camps.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}</select>
+          </div>
+        }
       />
+      <p className="text-xs text-ink-3">{filteredMedical.length} participant{filteredMedical.length !== 1 ? 's' : ''} sur {participants.length} · triés A→Z</p>
       {participants.length === 0 ? <EmptyState icon={HeartPulse} title="Aucune fiche médicale" text="Inscrivez des participants pour remplir les informations médicales." /> : (
         <div className="grid lg:grid-cols-2 gap-4">
-          {participants.map(p => {
+          {filteredMedical.map(p => {
             const editing = editingId === p.id
             return (
               <div key={p.id} className="card space-y-4">

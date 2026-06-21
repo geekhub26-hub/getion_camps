@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  CreditCard, Pencil, Plus, Printer, Download, RefreshCw, Save, Trash2, TrendingUp,
+  CreditCard, Pencil, Plus, Printer, Download, RefreshCw, Save, Search, Trash2, TrendingUp,
   TrendingDown, Wallet, X, CheckCircle, ArrowDownLeft, ArrowUpRight,
 } from 'lucide-react'
 import api from './http'
@@ -118,6 +118,7 @@ export default function CaissePage() {
   const [editPayMontant, setEditPayMontant] = useState('')
   const [editDepId, setEditDepId]     = useState<string | null>(null)
   const [editDepForm, setEditDepForm] = useState({ libelle: '', categorie: 'Logistique', montant: '' })
+  const [searchTx, setSearchTx] = useState('')
   const todayISO = new Date().toISOString().slice(0, 10)
   const [showRapportModal, setShowRapportModal] = useState(false)
   const [rapportDebut, setRapportDebut] = useState(todayISO)
@@ -261,15 +262,24 @@ export default function CaissePage() {
 
   const restant = Math.max(0, campPrice - alreadyPaidForSelected)
 
-  // Participants qui ont encore un solde > 0 et non dispensés
+  // Participants qui ont encore un solde > 0 et non dispensés, triés alphabétiquement
   const unpaidParticipants = useMemo(() =>
-    participants.filter(p => {
-      if (p.dispense) return false
-      const paid = paiements
-        .filter(pay => pay.participantId === p.id && !['ANNULE','REMBOURSE'].includes(pay.statut))
-        .reduce((s, pay) => s + Number(pay.montant), 0)
-      return paid < campPrice
-    }), [participants, paiements, campPrice])
+    participants
+      .filter(p => {
+        if (p.dispense) return false
+        const paid = paiements
+          .filter(pay => pay.participantId === p.id && !['ANNULE','REMBOURSE'].includes(pay.statut))
+          .reduce((s, pay) => s + Number(pay.montant), 0)
+        return paid < campPrice
+      })
+      .sort((a, b) => a.nom.localeCompare(b.nom, 'fr') || a.prenom.localeCompare(b.prenom, 'fr')),
+  [participants, paiements, campPrice])
+
+  const filteredTx = useMemo(() => {
+    if (!searchTx.trim()) return displayList
+    const q = searchTx.toLowerCase().trim()
+    return displayList.filter(op => op.label.toLowerCase().includes(q))
+  }, [displayList, searchTx])
 
   const marquerSolde = async () => {
     if (!payForm.participantId) return
@@ -562,17 +572,28 @@ export default function CaissePage() {
                 </button>
               ))}
             </div>
-            <span className="text-xs text-ink-3">{displayList.length} opération{displayList.length !== 1 ? 's' : ''}</span>
+            <span className="text-xs text-ink-3">{filteredTx.length} / {displayList.length} opération{displayList.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div className="px-4 py-2 border-b border-border">
+            <div className="relative">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-3" />
+              <input
+                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-border bg-canvas focus:outline-none focus:ring-2 focus:ring-primary/20"
+                placeholder="Filtrer par nom, libellé…"
+                value={searchTx}
+                onChange={e => setSearchTx(e.target.value)}
+              />
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto divide-y divide-border">
-            {displayList.length === 0 ? (
+            {filteredTx.length === 0 ? (
               <div className="text-center py-16">
                 <TrendingDown size={32} className="mx-auto mb-3 text-ink-3 opacity-30" />
                 <p className="text-ink-2 font-medium text-sm">Aucune opération</p>
-                <p className="text-ink-3 text-xs mt-1">{tab === 'today' ? "Aucune transaction aujourd'hui." : 'Aucune transaction pour ce camp.'}</p>
+                <p className="text-ink-3 text-xs mt-1">{searchTx ? 'Aucun résultat pour cette recherche.' : tab === 'today' ? "Aucune transaction aujourd'hui." : 'Aucune transaction pour ce camp.'}</p>
               </div>
-            ) : displayList.map(op => (
+            ) : filteredTx.map(op => (
               <div key={op.id} className={`flex items-center gap-4 px-5 py-3.5 hover:bg-surface/60 transition-colors ${isToday(op.ts) && tab === 'all' ? 'bg-sage/3' : ''}`}>
                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${op.sign === '+' ? 'bg-sage/10' : 'bg-ember/10'}`}>
                   {op.sign === '+' ? <ArrowDownLeft size={16} className="text-sage" /> : <ArrowUpRight size={16} className="text-ember" />}
