@@ -764,6 +764,22 @@ export function ParticipantsPage() {
     } catch { alert('Erreur lors de la suppression.') }
   }
 
+  const resolveGroupDoublons = async (group: Participant[]) => {
+    const toDelete = group.slice(1)
+    if (!window.confirm(`Garder "${group[0].prenom} ${group[0].nom}" #1 et supprimer ${toDelete.length} doublon${toDelete.length > 1 ? 's' : ''} ?`)) return
+    await Promise.allSettled(toDelete.map(p => api.delete(`/participants/${p.id}`)))
+    load()
+  }
+
+  const resolveAllCertainDoublons = async () => {
+    const certainGroups = doublons.filter(d => d.certain)
+    const toDelete = certainGroups.flatMap(d => d.group.slice(1))
+    if (toDelete.length === 0) return
+    if (!window.confirm(`Supprimer ${toDelete.length} doublon${toDelete.length > 1 ? 's' : ''} certains en gardant le premier enregistrement de chaque groupe ?`)) return
+    await Promise.allSettled(toDelete.map(p => api.delete(`/participants/${p.id}`)))
+    load()
+  }
+
   const loadArticlesSac = async (participantId: string) => {
     try {
       const { data } = await api.get<{ data: ArticleSac[] }>(`/participants/${participantId}/articles-sac`)
@@ -903,42 +919,64 @@ export function ParticipantsPage() {
 
       {doublons.length > 0 && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2">
               <AlertTriangle size={16} className="text-amber-600 shrink-0" />
               <p className="font-semibold text-sm text-amber-800">
                 {doublons.length} doublon{doublons.length > 1 ? 's' : ''} détecté{doublons.length > 1 ? 's' : ''} — {doublons.reduce((n, d) => n + d.group.length, 0)} entrées concernées
               </p>
             </div>
-            <button onClick={() => setShowDoublons(v => !v)} className="text-xs text-amber-600 hover:text-amber-800">
-              {showDoublons ? 'Réduire' : 'Voir'}
-            </button>
+            <div className="flex items-center gap-2">
+              {doublons.some(d => d.certain) && (
+                <button
+                  onClick={resolveAllCertainDoublons}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-ember text-white hover:bg-ember/90 font-medium"
+                >
+                  Supprimer les {doublons.filter(d => d.certain).flatMap(d => d.group.slice(1)).length} doublons certains
+                </button>
+              )}
+              <button onClick={() => setShowDoublons(v => !v)} className="text-xs text-amber-600 hover:text-amber-800">
+                {showDoublons ? 'Réduire' : 'Voir'}
+              </button>
+            </div>
           </div>
           {showDoublons && (
             <div className="space-y-3">
               {doublons.map(({ group, certain }) => (
                 <div key={group[0].id} className="rounded-xl bg-white border border-amber-200 overflow-hidden">
-                  <div className="px-4 py-2 bg-amber-100 border-b border-amber-200 flex items-center justify-between">
+                  <div className="px-4 py-2 bg-amber-100 border-b border-amber-200 flex items-center justify-between gap-2">
                     <p className="font-semibold text-sm text-amber-900">{group[0].prenom} {group[0].nom}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${certain ? 'bg-ember/15 text-ember' : 'bg-amber-200 text-amber-700'}`}>
-                      {certain ? 'Doublon certain' : 'Doublon possible'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${certain ? 'bg-ember/15 text-ember' : 'bg-amber-200 text-amber-700'}`}>
+                        {certain ? 'Doublon certain' : 'Doublon possible'}
+                      </span>
+                      <button
+                        onClick={() => resolveGroupDoublons(group)}
+                        className="text-xs px-2.5 py-1 rounded-lg bg-ember text-white hover:bg-ember/90 font-medium flex items-center gap-1"
+                      >
+                        <Trash2 size={11} /> Garder #1
+                      </button>
+                    </div>
                   </div>
                   <div className="grid divide-y divide-amber-100">
                     {group.map((p, i) => (
-                      <div key={p.id} className="flex items-start justify-between px-4 py-3 gap-3">
+                      <div key={p.id} className={`flex items-start justify-between px-4 py-3 gap-3 ${i === 0 ? 'bg-green-50/50' : ''}`}>
                         <div className="min-w-0 flex-1 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-0.5 text-xs">
                           <div><span className="text-ink-3">Paroisse</span><br /><span className="font-medium text-ink">{p.paroisse || '—'}</span></div>
                           <div><span className="text-ink-3">Né(e) le</span><br /><span className={`font-medium ${certain ? 'text-ember' : 'text-ink'}`}>{formatDate(p.dateNaissance)}</span></div>
                           <div><span className="text-ink-3">Lieu</span><br /><span className="font-medium text-ink">{p.lieuNaissance || '—'}</span></div>
                           <div><span className="text-ink-3">Statut</span><br /><span className="font-medium text-ink">{statutInscriptionLabel[p.statutInscription]}</span></div>
                         </div>
-                        <button
-                          onClick={() => deleteParticipant(p.id, `${p.prenom} ${p.nom} (#${i + 1})`)}
-                          className="shrink-0 text-xs px-2.5 py-1.5 rounded-lg border border-ember/30 text-ember hover:bg-ember/5 flex items-center gap-1"
-                        >
-                          <Trash2 size={12} /> Supprimer
-                        </button>
+                        {i === 0 ? (
+                          <span className="shrink-0 text-xs px-2.5 py-1.5 rounded-lg bg-sage/15 text-sage font-medium">Conserver</span>
+                        ) : (
+                          <button
+                            onClick={() => deleteParticipant(p.id, `${p.prenom} ${p.nom} (#${i + 1})`)}
+                            className="shrink-0 text-xs px-2.5 py-1.5 rounded-lg border border-ember/30 text-ember hover:bg-ember/5 flex items-center gap-1"
+                          >
+                            <Trash2 size={12} /> Supprimer
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
