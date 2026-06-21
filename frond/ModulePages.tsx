@@ -2,7 +2,7 @@ import type { FormEvent, ReactNode } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft, Calendar, Check, CheckCircle, CreditCard, Download, FileText, Mail, Pencil, Plus, Printer, Save,
+  AlertTriangle, ArrowLeft, Calendar, Check, CheckCircle, CreditCard, Download, FileText, Mail, Pencil, Plus, Printer, Save,
   HeartPulse, Search, Settings, Trash2, Upload, Users, X,
 } from 'lucide-react'
 import api from './http'
@@ -492,6 +492,17 @@ export function ParticipantsPage() {
     return [...set].sort()
   }, [participants])
 
+  const doublons = useMemo(() => {
+    const map = new Map<string, Participant[]>()
+    participants.forEach(p => {
+      const key = `${p.nom.trim().toLowerCase()}|${p.prenom.trim().toLowerCase()}`
+      map.set(key, [...(map.get(key) ?? []), p])
+    })
+    return [...map.values()].filter(g => g.length > 1)
+  }, [participants])
+
+  const [showDoublons, setShowDoublons] = useState(true)
+
   // Convert French label to Prisma RelationParent enum (PERE|MERE|TUTEUR|AUTRE)
   const toRelationEnum = (v: string): string => {
     const map: Record<string, string> = {
@@ -879,6 +890,47 @@ export function ParticipantsPage() {
         <div className={`rounded-xl border px-3 py-2 text-sm flex items-center gap-2 ${importResult.includes('erreur') ? 'border-gold/20 bg-gold/8 text-gold' : 'border-sage/20 bg-sage/8 text-sage'}`}>
           {importResult}
           <button className="ml-auto" onClick={() => setImportResult('')}><X size={14} /></button>
+        </div>
+      )}
+
+      {doublons.length > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+              <p className="font-semibold text-sm text-amber-800">
+                {doublons.length} doublon{doublons.length > 1 ? 's' : ''} détecté{doublons.length > 1 ? 's' : ''} — {doublons.reduce((n, g) => n + g.length, 0)} entrées concernées
+              </p>
+            </div>
+            <button onClick={() => setShowDoublons(v => !v)} className="text-xs text-amber-600 hover:text-amber-800">
+              {showDoublons ? 'Réduire' : 'Voir'}
+            </button>
+          </div>
+          {showDoublons && (
+            <div className="space-y-3">
+              {doublons.map(group => (
+                <div key={group[0].id} className="rounded-xl bg-white border border-amber-200 overflow-hidden">
+                  <div className="px-4 py-2 bg-amber-100 border-b border-amber-200">
+                    <p className="font-semibold text-sm text-amber-900">{group[0].prenom} {group[0].nom}</p>
+                  </div>
+                  {group.map((p, i) => (
+                    <div key={p.id} className="flex items-center justify-between px-4 py-2.5 gap-3 border-b border-amber-100 last:border-0">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-ink">#{i + 1} · {p.paroisse || 'Sans paroisse'}</p>
+                        <p className="text-xs text-ink-3">{formatDate(p.dateNaissance)} · {statutInscriptionLabel[p.statutInscription]}</p>
+                      </div>
+                      <button
+                        onClick={() => deleteParticipant(p.id, `${p.prenom} ${p.nom} (#${i + 1})`)}
+                        className="shrink-0 text-xs px-2.5 py-1.5 rounded-lg border border-ember/30 text-ember hover:bg-ember/5 flex items-center gap-1"
+                      >
+                        <Trash2 size={12} /> Supprimer
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
