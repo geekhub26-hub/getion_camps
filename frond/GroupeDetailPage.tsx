@@ -384,9 +384,7 @@ export default function GroupeDetailPage() {
                 <div className="flex-1">
                   <p className="font-medium text-sm">{activite.titre}</p>
                   <p className="text-xs text-ink-3">
-                    {new Date(activite.dateHeureDebut).toLocaleDateString('fr-FR', { 
-                      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' 
-                    })}
+                    {(() => { const d = new Date(activite.dateHeureDebut); return `${d.getUTCDate()} ${['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'][d.getUTCMonth()]} · ${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}` })()}
                   </p>
                 </div>
                 <Link to={`/planning`} className="text-xs text-sage hover:text-sage-light">

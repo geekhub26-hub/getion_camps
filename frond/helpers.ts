@@ -3,7 +3,13 @@ import { fr } from 'date-fns/locale'
 import type { StatutInscription, StatutPaiement, StatutCamp } from './index'
 
 export const formatDate = (d: string) => format(parseISO(d), 'dd MMM yyyy', { locale: fr })
-export const formatDateTime = (d: string) => format(parseISO(d), 'dd MMM yyyy · HH:mm', { locale: fr })
+export const formatDateTime = (d: string) => {
+  const dt = new Date(d)
+  // Times are stored as naive UTC (no tz conversion on submit). Use UTC
+  // components so the displayed time matches what the user originally entered.
+  const utcLike = new Date(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate(), dt.getUTCHours(), dt.getUTCMinutes())
+  return format(utcLike, 'dd MMM yyyy · HH:mm', { locale: fr })
+}
 export const fromNow = (d: string) => formatDistanceToNow(parseISO(d), { addSuffix: true, locale: fr })
 export const formatCFA = (n: number) => new Intl.NumberFormat('fr-CM', { style: 'currency', currency: 'XAF', maximumFractionDigits: 0 }).format(n)
 

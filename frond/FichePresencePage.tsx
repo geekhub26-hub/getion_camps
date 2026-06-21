@@ -19,10 +19,12 @@ function toLocalInput(iso: string): string {
 
 function formatHeure(iso: string): string {
   const d = new Date(iso)
-  return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
 }
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
+  const d = new Date(iso)
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+    .toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 function getErrorMessage(err: unknown): string {
   const r = (err as any)?.response?.data?.message
@@ -69,17 +71,6 @@ export default function FichePresencePage() {
     setShowModal(true)
   }
 
-  const toUTC = (local: string): string => {
-    if (!local) return ''
-    const offset = new Date().getTimezoneOffset() // minutes, négatif pour UTC+
-    const sign = offset <= 0 ? '+' : '-'
-    const abs = Math.abs(offset)
-    const hh = String(Math.floor(abs / 60)).padStart(2, '0')
-    const mm = String(abs % 60).padStart(2, '0')
-    const withSecs = local.length === 16 ? `${local}:00` : local
-    return new Date(`${withSecs}${sign}${hh}:${mm}`).toISOString()
-  }
-
   const save = async () => {
     if (!form.campIdForm || !form.nom || !form.prenom || !form.heureSortie || !form.motif) {
       setError('Veuillez remplir tous les champs obligatoires.'); return
@@ -87,11 +78,7 @@ export default function FichePresencePage() {
     setError(''); setSaving(true)
     try {
       const { campIdForm, ...rest } = form
-      await api.post('/fiches-presence', {
-        ...rest,
-        heureSortie: toUTC(rest.heureSortie),
-        campId: campIdForm,
-      })
+      await api.post('/fiches-presence', { ...rest, campId: campIdForm })
       setShowModal(false); load()
     } catch (err) { setError(getErrorMessage(err)) }
     finally { setSaving(false) }
@@ -105,7 +92,7 @@ export default function FichePresencePage() {
   const saveRetour = async () => {
     if (!showRetour) return
     await api.put(`/fiches-presence/${showRetour.id}`, {
-      heureRetour: toUTC(retourForm.heureRetour),
+      heureRetour: retourForm.heureRetour,
       signature: retourForm.signature || undefined,
     })
     setShowRetour(null); load()

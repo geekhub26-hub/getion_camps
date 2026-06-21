@@ -1431,25 +1431,12 @@ export function PlanningPage() {
   }
   useEffect(load, [campId])
 
-  const toUTC = (local: string): string => {
-    if (!local) return ''
-    const offset = new Date().getTimezoneOffset() // minutes, négatif pour UTC+
-    const sign = offset <= 0 ? '+' : '-'
-    const abs = Math.abs(offset)
-    const hh = String(Math.floor(abs / 60)).padStart(2, '0')
-    const mm = String(abs % 60).padStart(2, '0')
-    const withSecs = local.length === 16 ? `${local}:00` : local
-    return new Date(`${withSecs}${sign}${hh}:${mm}`).toISOString()
-  }
-
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     setPlanError('')
     try {
       await api.post('/activites', {
         ...form,
-        dateHeureDebut: toUTC(form.dateHeureDebut),
-        dateHeureFin: toUTC(form.dateHeureFin),
         campId,
       })
       setForm({ titre: '', description: '', lieu: '', dateHeureDebut: '', dateHeureFin: '', couleur: '#2563eb' })
