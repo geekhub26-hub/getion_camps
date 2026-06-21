@@ -17,7 +17,9 @@ interface GroupeDetail {
   camp: { id: string; nom: string }
   animateur: {
     id: string
-    user: { nom: string; prenom: string; email: string; avatarUrl: string | null }
+    nom: string
+    prenom: string
+    telephone: string | null
   } | null
   participants: {
     participant: Participant
@@ -81,21 +83,23 @@ export default function GroupeDetailPage() {
     setLoading(true)
     api.get(`/groupes/${id}`)
       .then(res => {
-        setGroupe(res.data.data)
+        const data = res.data.data
+        setGroupe(data)
         setEditForm({
-          nom: res.data.data.nom,
-          couleur: res.data.data.couleur,
-          animateurId: res.data.data.animateurId || '',
-          description: res.data.data.description || ''
+          nom: data.nom,
+          couleur: data.couleur,
+          animateurId: data.animateurId || '',
+          description: data.description || ''
         })
+        if (data.camp?.id) loadAnimateurs(data.camp.id)
       })
       .catch(() => navigate('/groupes'))
       .finally(() => setLoading(false))
   }
 
   // Charger les animateurs pour le formulaire d'édition
-  const loadAnimateurs = () => {
-    api.get('/animateurs/disponibles/liste')
+  const loadAnimateurs = (campId: string) => {
+    api.get(`/animateurs?campId=${campId}&perPage=100`)
       .then(res => setAnimateurs(res.data.data || []))
       .catch(() => setAnimateurs([]))
   }
@@ -118,7 +122,6 @@ export default function GroupeDetailPage() {
 
   useEffect(() => {
     loadGroupe()
-    loadAnimateurs()
   }, [id])
 
   useEffect(() => {
@@ -223,7 +226,7 @@ export default function GroupeDetailPage() {
                 {groupe.animateur && (
                   <div className="flex items-center gap-1.5 text-sm text-ink-3">
                     <UserRound size={14} />
-                    <span>Animateur: {groupe.animateur.user.prenom} {groupe.animateur.user.nom}</span>
+                    <span>Animateur: {groupe.animateur.prenom} {groupe.animateur.nom}</span>
                   </div>
                 )}
                 <div className="flex items-center gap-1.5 text-sm text-ink-3">
@@ -430,7 +433,7 @@ export default function GroupeDetailPage() {
                   <option value="">Non assigné</option>
                   {animateurs.map(a => (
                     <option key={a.id} value={a.id}>
-                      {a.user?.prenom} {a.user?.nom} - {a.camp?.nom}
+                      {a.prenom} {a.nom}{a.telephone ? ` · ${a.telephone}` : ''}
                     </option>
                   ))}
                 </select>
