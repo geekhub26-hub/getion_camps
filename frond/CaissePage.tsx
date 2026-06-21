@@ -245,13 +245,14 @@ export default function CaissePage() {
     printRapport(campNom, periode, entreesFiltrees, depensesFiltrees)
   }
 
-  const displayList = tab === 'today'
-    ? [...entreesAujourd.map(p => ({ id: p.id, participantId: p.participantId, label: p.participant ? `${p.participant.prenom} ${p.participant.nom}` : (p.libelle || 'Entrée directe'), detail: METHODES.find(m => m.value === p.methode)?.label || p.methode, montant: Number(p.montant), sign: '+' as const, statut: p.statut, ts: p.datePaiement || '' })),
-       ...depensesAujourd.map(d => ({ id: d.id, participantId: undefined as string | undefined, label: d.libelle, detail: d.categorie, montant: Number(d.montant), sign: '-' as const, statut: '', ts: d.dateDepense }))]
-      .sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime())
-    : [...paiements.map(p => ({ id: p.id, participantId: p.participantId, label: p.participant ? `${p.participant.prenom} ${p.participant.nom}` : (p.libelle || 'Entrée directe'), detail: METHODES.find(m => m.value === p.methode)?.label || p.methode, montant: Number(p.montant), sign: '+' as const, statut: p.statut, ts: p.datePaiement ?? '' })),
-       ...depenses.map(d => ({ id: d.id, participantId: undefined as string | undefined, label: d.libelle, detail: d.categorie, montant: Number(d.montant), sign: '-' as const, statut: '', ts: d.dateDepense }))]
-      .sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime())
+  const displayList = useMemo(() => {
+    const toP = (p: PayItem) => ({ id: p.id, participantId: p.participantId, label: p.participant ? `${p.participant.prenom} ${p.participant.nom}` : (p.libelle || 'Entrée directe'), detail: METHODES.find(m => m.value === p.methode)?.label || p.methode, montant: Number(p.montant), sign: '+' as const, statut: p.statut, ts: p.datePaiement || '' })
+    const toD = (d: DepItem) => ({ id: d.id, participantId: undefined as string | undefined, label: d.libelle, detail: d.categorie, montant: Number(d.montant), sign: '-' as const, statut: '', ts: d.dateDepense })
+    const list = tab === 'today'
+      ? [...entreesAujourd.map(toP), ...depensesAujourd.map(toD)]
+      : [...paiements.map(toP), ...depenses.map(toD)]
+    return list.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime())
+  }, [tab, entreesAujourd, depensesAujourd, paiements, depenses])
 
   const alreadyPaidForSelected = useMemo(() => {
     if (!payForm.participantId) return 0

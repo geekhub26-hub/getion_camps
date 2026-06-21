@@ -4,6 +4,32 @@ import { Users, Plus, Edit2, Trash2, UserPlus, UserMinus, Palette, X } from 'luc
 import api from './http'
 import type { Camp } from './index'
 
+interface ParticipantMin {
+  id: string
+  dateNaissance: string
+  niveauScolaire: string | null
+}
+
+function matchesCategorie(p: ParticipantMin, categorie: string, refDate: Date): boolean {
+  const cat = categorie.toLowerCase()
+  // Age range : "(10-12 ans)", "(13-15 ans)", etc.
+  const ageMatch = categorie.match(/\((\d+)-(\d+)\s*ans\)/i)
+  if (ageMatch && p.dateNaissance) {
+    const birth = new Date(p.dateNaissance)
+    let age = refDate.getUTCFullYear() - birth.getUTCFullYear()
+    const m = refDate.getUTCMonth() - birth.getUTCMonth()
+    if (m < 0 || (m === 0 && refDate.getUTCDate() < birth.getUTCDate())) age--
+    return age >= Number(ageMatch[1]) && age <= Number(ageMatch[2])
+  }
+  // Niveau scolaire
+  if (!p.niveauScolaire) return false
+  const n = p.niveauScolaire.toLowerCase()
+  if (/6.*5|5.*6/.test(cat)) return /6[eè]/.test(n) || /5[eè]/.test(n) || n.includes('sixième') || n.includes('cinquième')
+  if (/4.*3|3.*4/.test(cat)) return /4[eè]/.test(n) || /3[eè]/.test(n) || n.includes('quatrième') || n.includes('troisième')
+  if (cat.includes('2nde') || cat.includes('tle') || cat.includes('2nd')) return n.includes('2nd') || n.includes('seconde') || n.includes('1er') || n.includes('premi') || n.includes('tle') || n.includes('termin')
+  return false
+}
+
 interface Groupe {
   id: string
   nom: string
@@ -129,6 +155,7 @@ export default function GroupesPage() {
     animateurId: '',
     description: ''
   })
+  const [autoMsg, setAutoMsg] = useState('')
 
   // Charger les camps
   useEffect(() => {
@@ -172,7 +199,22 @@ export default function GroupesPage() {
       if (editing) {
         await api.put(`/groupes/${editing.id}`, form)
       } else {
-        await api.post(`/camps/${campId}/groupes`, form)
+        const res = await api.post(`/camps/${campId}/groupes`, form)
+        const groupeId: string = res.data.data?.id
+
+        // Auto-assigner les participants correspondant à la catégorie
+        if (form.categorie && groupeId) {
+          const camp = camps.find(c => c.id === campId)
+          const refDate = camp?.dateDebut ? new Date(camp.dateDebut) : new Date()
+          const partRes = await api.get<{ data: ParticipantMin[] }>(`/camps/${campId}/participants?perPage=500&fields=id,dateNaissance,niveauScolaire`)
+          const allP: ParticipantMin[] = partRes.data.data || []
+          const matching = allP.filter(p => matchesCategorie(p, form.categorie, refDate))
+          if (matching.length > 0) {
+            await Promise.allSettled(matching.map(p => api.post(`/groupes/${groupeId}/participants/${p.id}`)))
+            setAutoMsg(`✓ ${matching.length} participant${matching.length > 1 ? 's' : ''} ajouté${matching.length > 1 ? 's' : ''} automatiquement dans "${form.nom}".`)
+            setTimeout(() => setAutoMsg(''), 6000)
+          }
+        }
       }
       setShowForm(false)
       setEditing(null)
@@ -231,6 +273,13 @@ export default function GroupesPage() {
           </div>
         }
       />
+
+      {autoMsg && (
+        <div className="rounded-xl border border-sage/30 bg-sage/8 px-4 py-3 text-sm text-sage flex items-center gap-2">
+          {autoMsg}
+          <button className="ml-auto text-sage/60 hover:text-sage" onClick={() => setAutoMsg('')}><X size={14} /></button>
+        </div>
+      )}
 
       {/* Modal Formulaire */}
       {showForm && (
