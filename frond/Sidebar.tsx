@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Tent, Users, Calendar, CreditCard,
   FileText, MessageSquare, BarChart3, Settings, LogOut, Menu, X, HeartPulse, UserRound,
-  ClipboardList, UserCheck, Gift, BookOpen
+  ClipboardList, UserCheck, Gift, BookOpen, NotebookPen
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuthStore } from './auth.store'
@@ -23,7 +23,8 @@ const navItems = [
   { to: '/presence',    icon: ClipboardList,   label: 'Présence / Sorties' },
   { to: '/visiteurs',   icon: UserCheck,       label: 'Visiteurs' },
   { to: '/dons',        icon: Gift,            label: 'Dons' },
-  { to: '/rapport',    icon: BookOpen,        label: 'Rapport journalier' },
+  { to: '/rapport',        icon: BookOpen,      label: 'Rapport journalier' },
+  { to: '/enseignements',  icon: NotebookPen,   label: 'Enseignements' },
 ]
 
 export default function Sidebar() {

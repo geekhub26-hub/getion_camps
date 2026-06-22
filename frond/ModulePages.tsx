@@ -2,7 +2,7 @@ import type { FormEvent, ReactNode } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
-  AlertTriangle, ArrowLeft, Calendar, Check, CheckCircle, CreditCard, Download, FileText, Mail, Pencil, Plus, Printer, Save,
+  AlertTriangle, ArrowLeft, Calendar, Check, CheckCircle, CreditCard, Download, Edit2, FileText, Mail, Pencil, Plus, Printer, Save,
   HeartPulse, Search, Settings, Trash2, Upload, Users, X,
 } from 'lucide-react'
 import api from './http'
@@ -210,6 +210,8 @@ export function CampDetailPage() {
   const [paroisses, setParoisses] = useState<CampParoisse[]>([])
   const [paroisseForm, setParoisseForm] = useState({ nom: '', responsable: '', telephone: '' })
   const [paroisseError, setParoisseError] = useState('')
+  const [editingParoisseId, setEditingParoisseId] = useState<string | null>(null)
+  const [paroisseEditForm, setParoisseEditForm] = useState({ nom: '', responsable: '', telephone: '', prixParticipant: '' })
   const [showEditModal, setShowEditModal] = useState(false)
   const [editForm, setEditForm] = useState({ ...emptyCamp, statut: 'OUVERT' as string })
   const [editSaving, setEditSaving] = useState(false)
@@ -287,6 +289,20 @@ export function CampDetailPage() {
     loadParoisses()
   }
 
+  const startEditParoisse = (p: CampParoisse) => {
+    setEditingParoisseId(p.id)
+    setParoisseEditForm({ nom: p.nom, responsable: p.responsable || '', telephone: p.telephone || '', prixParticipant: p.prixParticipant != null ? String(p.prixParticipant) : '' })
+  }
+
+  const saveEditParoisse = async (paroisseId: string) => {
+    await api.put(`/camps/${id}/paroisses/${paroisseId}`, {
+      ...paroisseEditForm,
+      prixParticipant: paroisseEditForm.prixParticipant === '' ? null : Number(paroisseEditForm.prixParticipant),
+    })
+    setEditingParoisseId(null)
+    loadParoisses()
+  }
+
   if (loading) return <div className="card animate-pulse h-40" />
   if (!camp) return <EmptyState icon={Calendar} title="Camp introuvable" text="Ce camp n'existe pas ou n'est plus disponible." />
 
@@ -333,13 +349,35 @@ export function CampDetailPage() {
           <p className="text-xs text-ink-3 text-center py-2">Aucune paroisse définie — les participants peuvent saisir librement.</p>
         ) : (
           <div className="space-y-1.5">
-            {paroisses.map(p => (
-              <div key={p.id} className="flex items-center justify-between rounded-xl border border-border bg-surface px-4 py-2.5">
-                <div>
-                  <p className="text-sm font-medium">{p.nom}</p>
-                  {(p.responsable || p.telephone) && <p className="text-xs text-ink-3">{p.responsable}{p.telephone ? ` · ${p.telephone}` : ''}</p>}
+            {paroisses.map(p => editingParoisseId === p.id ? (
+              <div key={p.id} className="rounded-xl border border-sage/40 bg-surface p-3 space-y-2">
+                <div className="grid sm:grid-cols-2 gap-2">
+                  <input className="input-field" placeholder="Nom *" value={paroisseEditForm.nom} onChange={e => setParoisseEditForm(f => ({ ...f, nom: e.target.value }))} />
+                  <input className="input-field" placeholder="Responsable" value={paroisseEditForm.responsable} onChange={e => setParoisseEditForm(f => ({ ...f, responsable: e.target.value }))} />
+                  <input className="input-field" placeholder="Téléphone" value={paroisseEditForm.telephone} onChange={e => setParoisseEditForm(f => ({ ...f, telephone: e.target.value }))} />
+                  <div className="relative">
+                    <input type="number" className="input-field pr-12" placeholder="Prix / participant" value={paroisseEditForm.prixParticipant} onChange={e => setParoisseEditForm(f => ({ ...f, prixParticipant: e.target.value }))} />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ink-3">FCFA</span>
+                  </div>
                 </div>
-                <button onClick={() => deleteParoisse(p.id)} className="text-ink-3 hover:text-ember p-1.5 rounded-lg hover:bg-ember/5 transition-colors"><Trash2 size={14} /></button>
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => setEditingParoisseId(null)} className="btn-ghost px-3 py-1.5 text-xs">Annuler</button>
+                  <button onClick={() => saveEditParoisse(p.id)} className="btn-primary px-3 py-1.5 text-xs">Enregistrer</button>
+                </div>
+              </div>
+            ) : (
+              <div key={p.id} className="flex items-center justify-between rounded-xl border border-border bg-surface px-4 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">{p.nom}</p>
+                  <p className="text-xs text-ink-3">
+                    {p.responsable || ''}{p.telephone ? ` · ${p.telephone}` : ''}
+                    {p.prixParticipant != null ? <span className="ml-2 px-1.5 py-0.5 rounded bg-sage/10 text-sage font-medium">{Number(p.prixParticipant).toLocaleString('fr-FR')} FCFA/pers.</span> : <span className="ml-2 text-ink-3/60">Prix non défini</span>}
+                  </p>
+                </div>
+                <div className="flex gap-1">
+                  <button onClick={() => startEditParoisse(p)} className="text-ink-3 hover:text-sage p-1.5 rounded-lg hover:bg-sage/10 transition-colors"><Edit2 size={14} /></button>
+                  <button onClick={() => deleteParoisse(p.id)} className="text-ink-3 hover:text-ember p-1.5 rounded-lg hover:bg-ember/5 transition-colors"><Trash2 size={14} /></button>
+                </div>
               </div>
             ))}
           </div>

@@ -25,6 +25,7 @@ import fichePresenceRoutes from './routes/fichePresence.routes'
 import visiteurRoutes from './routes/visiteur.routes'
 import donRoutes from './routes/don.routes'
 import articleSacRoutes from './routes/articleSac.routes'
+import enseignementRoutes from './routes/enseignement.routes'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -86,6 +87,8 @@ app.use('/api/fiches-presence', fichePresenceRoutes)
 app.use('/api/visiteurs',       visiteurRoutes)
 app.use('/api/dons',            donRoutes)
 app.use('/api/participants/:participantId/articles-sac', articleSacRoutes)
+app.use('/api/camps/:campId/enseignements', enseignementRoutes)
+app.use('/api/enseignements', enseignementRoutes)
 
 // ─── 404 API ─────────────────────────────────────────────────
 app.use('/api', notFound)

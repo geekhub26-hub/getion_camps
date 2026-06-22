@@ -174,6 +174,23 @@ export const createCampParoisse = async (req: AuthRequest, res: Response, next: 
   } catch (err) { next(err) }
 }
 
+// ─── PUT /camps/:campId/paroisses/:paroisseId ────────────────
+export const updateCampParoisse = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { nom, responsable, telephone, prixParticipant } = req.body
+    const p = await prisma.campParoisse.update({
+      where: { id: req.params.paroisseId },
+      data: {
+        ...(nom !== undefined && { nom }),
+        ...(responsable !== undefined && { responsable }),
+        ...(telephone !== undefined && { telephone }),
+        ...(prixParticipant !== undefined && { prixParticipant: prixParticipant === '' || prixParticipant === null ? null : Number(prixParticipant) }),
+      },
+    })
+    sendSuccess(res, p, 'Paroisse mise à jour')
+  } catch (err) { next(err) }
+}
+
 // ─── DELETE /camps/:campId/paroisses/:paroisseId ──────────────
 export const deleteCampParoisse = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {

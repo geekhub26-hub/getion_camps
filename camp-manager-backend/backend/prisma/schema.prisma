@@ -153,6 +153,7 @@ model Camp {
   visiteurs       Visiteur[]
   dons            Don[]
   paroisses       CampParoisse[]
+  enseignements   Enseignement[]
 
   @@map("camps")
 }
@@ -162,11 +163,12 @@ model Camp {
 // ─────────────────────────────────────────
 
 model CampParoisse {
-  id          String  @id @default(uuid())
-  campId      String  @map("camp_id")
-  nom         String
-  responsable String?
-  telephone   String?
+  id              String   @id @default(uuid())
+  campId          String   @map("camp_id")
+  nom             String
+  responsable     String?
+  telephone       String?
+  prixParticipant Decimal? @map("prix_participant") @db.Decimal(10, 2)
 
   camp Camp @relation(fields: [campId], references: [id], onDelete: Cascade)
 
@@ -550,6 +552,26 @@ model ArticleSac {
   participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
 
   @@map("articles_sac")
+}
+
+// ─────────────────────────────────────────
+//  ENSEIGNEMENT — Journal des enseignements
+// ─────────────────────────────────────────
+
+model Enseignement {
+  id        String   @id @default(uuid())
+  campId    String   @map("camp_id")
+  date      DateTime
+  orateur   String
+  theme     String
+  contenu   String   @db.Text
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  camp Camp @relation(fields: [campId], references: [id], onDelete: Cascade)
+
+  @@map("enseignements")
 }
 
 model Don {

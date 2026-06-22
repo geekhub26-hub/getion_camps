@@ -4,7 +4,7 @@ import {
   TrendingDown, Wallet, X, CheckCircle, ArrowDownLeft, ArrowUpRight,
 } from 'lucide-react'
 import api from './http'
-import type { Camp, Depense, Paiement, Participant } from './index'
+import type { Camp, CampParoisse, Depense, Paiement, Participant } from './index'
 import { formatCFA } from './helpers'
 
 type ApiList<T> = { data: T[]; meta?: { total?: number } }
@@ -100,7 +100,8 @@ export default function CaissePage() {
   const [participants, setParticipants] = useState<Participant[]>([])
   const [paiements, setPaiements]       = useState<PayItem[]>([])
   const [depenses, setDepenses]         = useState<DepItem[]>([])
-  const [tab, setTab]           = useState<'today' | 'all'>('today')
+  const [tab, setTab]           = useState<'today' | 'all' | 'paroisse'>('today')
+  const [paroisses, setParoisses] = useState<CampParoisse[]>([])
   const [error, setError]       = useState('')
   const [paySuccess, setPaySuccess] = useState('')
   const [saving, setSaving]     = useState(false)
@@ -133,8 +134,11 @@ export default function CaissePage() {
     if (!campId) return
     const camp = camps.find(c => c.id === campId)
     if (camp) setCampPrice(camp.prixBase)
-    api.get<ApiList<Participant>>(`/camps/${campId}/participants?perPage=200`)
+    api.get<ApiList<Participant>>(`/camps/${campId}/participants?perPage=500`)
       .then(({ data }) => { setParticipants(data.data || []); setPayForm(f => ({ ...f, participantId: data.data[0]?.id || '' })) })
+    api.get<ApiList<CampParoisse>>(`/camps/${campId}/paroisses`)
+      .then(({ data }) => setParoisses(data.data || []))
+      .catch(() => setParoisses([]))
   }, [campId, camps])
 
   const load = () => {
@@ -566,15 +570,82 @@ export default function CaissePage() {
         <div className="lg:col-span-3 card p-0 overflow-hidden flex flex-col">
           <div className="px-5 py-3 border-b border-border bg-surface flex items-center justify-between">
             <div className="flex gap-1">
-              {(['today', 'all'] as const).map(t => (
+              {(['today', 'all', 'paroisse'] as const).map(t => (
                 <button key={t} onClick={() => setTab(t)}
                   className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${tab === t ? 'bg-sage text-white' : 'text-ink-2 hover:bg-border'}`}>
-                  {t === 'today' ? "Aujourd'hui" : 'Tout voir'}
+                  {t === 'today' ? "Aujourd'hui" : t === 'all' ? 'Tout voir' : 'Par paroisse'}
                 </button>
               ))}
             </div>
-            <span className="text-xs text-ink-3">{filteredTx.length} / {displayList.length} opération{displayList.length !== 1 ? 's' : ''}</span>
+            <span className="text-xs text-ink-3">{tab === 'paroisse' ? `${paroisses.length} paroisses` : `${filteredTx.length} / ${displayList.length} opération${displayList.length !== 1 ? 's' : ''}`}</span>
           </div>
+
+          {/* ── Vue bilan par paroisse ───────────────────── */}
+          {tab === 'paroisse' ? (
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {paroisses.length === 0 ? (
+                <div className="text-center py-12 text-ink-3 text-sm">
+                  <p>Aucune paroisse configurée.</p>
+                  <p className="text-xs mt-1">Ajoutez les paroisses dans Paramètres du camp.</p>
+                </div>
+              ) : (() => {
+                const payByParticipant = new Map<string, number>()
+                paiements.filter(p => p.statut !== 'ANNULE').forEach(p => {
+                  if (p.participantId) payByParticipant.set(p.participantId, (payByParticipant.get(p.participantId) ?? 0) + Number(p.montant))
+                })
+                const rows = paroisses.map(par => {
+                  const members = participants.filter(p => p.paroisse === par.nom)
+                  const prix = par.prixParticipant != null ? Number(par.prixParticipant) : null
+                  const attendu = prix != null ? members.length * prix : null
+                  const paye = members.reduce((s, p) => s + (payByParticipant.get(p.id) ?? 0), 0)
+                  const reste = attendu != null ? attendu - paye : null
+                  return { par, members: members.length, prix, attendu, paye, reste }
+                })
+                const totalAttendu = rows.reduce((s, r) => s + (r.attendu ?? 0), 0)
+                const totalPaye   = rows.reduce((s, r) => s + r.paye, 0)
+                const totalReste  = totalAttendu - totalPaye
+                return (
+                  <>
+                    {rows.map(({ par, members, prix, attendu, paye, reste }) => (
+                      <div key={par.id} className="rounded-xl border border-border bg-surface/50 px-4 py-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-semibold text-sm text-ink">{par.nom}</p>
+                            <p className="text-xs text-ink-3">{members} participant{members !== 1 ? 's' : ''}{prix != null ? ` · ${formatCFA(prix)}/pers.` : ' · prix non défini'}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className={`text-sm font-bold ${reste != null && reste > 0 ? 'text-ember' : 'text-sage'}`}>{reste != null ? formatCFA(reste) : '—'}</p>
+                            <p className="text-xs text-ink-3">reste dû</p>
+                          </div>
+                        </div>
+                        {attendu != null && (
+                          <div className="flex gap-4 text-xs">
+                            <span className="text-ink-3">Attendu : <strong className="text-ink">{formatCFA(attendu)}</strong></span>
+                            <span className="text-ink-3">Payé : <strong className="text-sage">{formatCFA(paye)}</strong></span>
+                          </div>
+                        )}
+                        {attendu != null && (
+                          <div className="w-full bg-border rounded-full h-1.5 overflow-hidden">
+                            <div className="h-full bg-sage rounded-full transition-all" style={{ width: `${Math.min(100, attendu > 0 ? (paye / attendu) * 100 : 0)}%` }} />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {totalAttendu > 0 && (
+                      <div className="rounded-xl border border-sage/30 bg-sage/5 px-4 py-3 flex items-center justify-between">
+                        <p className="text-sm font-semibold text-ink">Total global</p>
+                        <div className="text-right text-xs space-y-0.5">
+                          <p className="text-ink-3">Attendu : <strong className="text-ink">{formatCFA(totalAttendu)}</strong></p>
+                          <p className="text-ink-3">Payé : <strong className="text-sage">{formatCFA(totalPaye)}</strong> · Reste : <strong className="text-ember">{formatCFA(totalReste)}</strong></p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
+            </div>
+          ) : (
+          <>
           <div className="px-4 py-2 border-b border-border">
             <div className="relative">
               <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-3" />
@@ -670,6 +741,8 @@ export default function CaissePage() {
               <span className="text-ember font-semibold">-{formatCFA(depensesAujourd.reduce((s, d) => s + Number(d.montant), 0))}</span>
             </div>
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>

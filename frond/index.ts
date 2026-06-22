@@ -21,6 +21,7 @@ export interface CampParoisse {
   nom: string
   responsable?: string
   telephone?: string
+  prixParticipant?: number | null
 }
 
 export interface Camp {

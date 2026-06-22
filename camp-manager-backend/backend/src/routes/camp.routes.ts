@@ -19,8 +19,9 @@ router.get('/:campId/participants', staffOnly, participant.getParticipants)
 router.post('/:campId/participants', staffOnly, participant.createParticipant)
 
 // Paroisses d'un camp
-router.get('/:campId/paroisses', staffOnly, camp.getCampParoisses)
-router.post('/:campId/paroisses', adminOnly, camp.createCampParoisse)
-router.delete('/:campId/paroisses/:paroisseId', adminOnly, camp.deleteCampParoisse)
+router.get('/:campId/paroisses',                   staffOnly, camp.getCampParoisses)
+router.post('/:campId/paroisses',                  staffOnly, camp.createCampParoisse)
+router.put('/:campId/paroisses/:paroisseId',       staffOnly, camp.updateCampParoisse)
+router.delete('/:campId/paroisses/:paroisseId',    adminOnly, camp.deleteCampParoisse)
 
 export default router
