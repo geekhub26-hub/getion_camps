@@ -102,6 +102,7 @@ export default function CaissePage() {
   const [depenses, setDepenses]         = useState<DepItem[]>([])
   const [tab, setTab]           = useState<'today' | 'all' | 'paroisse'>('today')
   const [paroisses, setParoisses] = useState<CampParoisse[]>([])
+  const [expandedParoisse, setExpandedParoisse] = useState<string | null>(null)
   const [error, setError]       = useState('')
   const [paySuccess, setPaySuccess] = useState('')
   const [saving, setSaving]     = useState(false)
@@ -583,60 +584,98 @@ export default function CaissePage() {
           {/* ── Vue bilan par paroisse ───────────────────── */}
           {tab === 'paroisse' ? (
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {paroisses.length === 0 ? (
-                <div className="text-center py-12 text-ink-3 text-sm">
-                  <p>Aucune paroisse configurée.</p>
-                  <p className="text-xs mt-1">Ajoutez les paroisses dans Paramètres du camp.</p>
-                </div>
-              ) : (() => {
+              {(() => {
                 const payByParticipant = new Map<string, number>()
                 paiements.filter(p => p.statut !== 'ANNULE').forEach(p => {
                   if (p.participantId) payByParticipant.set(p.participantId, (payByParticipant.get(p.participantId) ?? 0) + Number(p.montant))
                 })
-                const rows = paroisses.map(par => {
-                  const members = participants.filter(p => p.paroisse === par.nom)
-                  const prix = par.prixParticipant != null ? Number(par.prixParticipant) : null
-                  const attendu = prix != null ? members.length * prix : null
-                  const paye = members.reduce((s, p) => s + (payByParticipant.get(p.id) ?? 0), 0)
-                  const reste = attendu != null ? attendu - paye : null
-                  return { par, members: members.length, prix, attendu, paye, reste }
-                })
+                // paroisses du camp + "Autres" pour participants sans paroisse connue
+                const paroisseNames = new Set(paroisses.map(p => p.nom))
+                const orphans = participants.filter(p => !p.paroisse || !paroisseNames.has(p.paroisse))
+                const rows = [
+                  ...paroisses.map(par => {
+                    const members = participants.filter(p => p.paroisse === par.nom)
+                    const prix = par.prixParticipant != null ? Number(par.prixParticipant) : null
+                    const attendu = prix != null ? members.length * prix : null
+                    const paye = members.reduce((s, p) => s + (payByParticipant.get(p.id) ?? 0), 0)
+                    return { id: par.id, nom: par.nom, members, prix, attendu, paye, reste: attendu != null ? attendu - paye : null }
+                  }),
+                  ...(orphans.length ? [{
+                    id: '__autres__', nom: 'Autres / sans paroisse', members: orphans, prix: null as number | null,
+                    attendu: null as number | null,
+                    paye: orphans.reduce((s, p) => s + (payByParticipant.get(p.id) ?? 0), 0),
+                    reste: null as number | null,
+                  }] : []),
+                ]
                 const totalAttendu = rows.reduce((s, r) => s + (r.attendu ?? 0), 0)
                 const totalPaye   = rows.reduce((s, r) => s + r.paye, 0)
-                const totalReste  = totalAttendu - totalPaye
+                if (rows.length === 0) return (
+                  <div className="text-center py-12 text-ink-3 text-sm">
+                    <p>Aucune paroisse configurée.</p>
+                    <p className="text-xs mt-1">Ajoutez les paroisses dans le détail du camp.</p>
+                  </div>
+                )
                 return (
                   <>
-                    {rows.map(({ par, members, prix, attendu, paye, reste }) => (
-                      <div key={par.id} className="rounded-xl border border-border bg-surface/50 px-4 py-3 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-semibold text-sm text-ink">{par.nom}</p>
-                            <p className="text-xs text-ink-3">{members} participant{members !== 1 ? 's' : ''}{prix != null ? ` · ${formatCFA(prix)}/pers.` : ' · prix non défini'}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className={`text-sm font-bold ${reste != null && reste > 0 ? 'text-ember' : 'text-sage'}`}>{reste != null ? formatCFA(reste) : '—'}</p>
-                            <p className="text-xs text-ink-3">reste dû</p>
-                          </div>
+                    {rows.map(({ id, nom, members, prix, attendu, paye, reste }) => {
+                      const isOpen = expandedParoisse === id
+                      return (
+                        <div key={id} className="rounded-xl border border-border overflow-hidden">
+                          {/* En-tête cliquable */}
+                          <button
+                            className="w-full text-left px-4 py-3 bg-surface/50 hover:bg-surface transition-colors space-y-2"
+                            onClick={() => setExpandedParoisse(isOpen ? null : id)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-semibold text-sm text-ink">{nom}</p>
+                                <p className="text-xs text-ink-3">{members.length} participant{members.length !== 1 ? 's' : ''}{prix != null ? ` · ${formatCFA(prix)}/pers.` : ''}</p>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div className="text-right">
+                                  <p className={`text-sm font-bold ${reste != null && reste > 0 ? 'text-ember' : reste === 0 ? 'text-sage' : 'text-ink'}`}>
+                                    {reste != null ? formatCFA(reste) : `${formatCFA(paye)} payé`}
+                                  </p>
+                                  <p className="text-xs text-ink-3">{reste != null ? 'reste dû' : 'total payé'}</p>
+                                </div>
+                                <span className="text-ink-3">{isOpen ? '▲' : '▼'}</span>
+                              </div>
+                            </div>
+                            {attendu != null && (
+                              <div className="w-full bg-border rounded-full h-1.5 overflow-hidden">
+                                <div className="h-full bg-sage rounded-full transition-all" style={{ width: `${Math.min(100, attendu > 0 ? (paye / attendu) * 100 : 0)}%` }} />
+                              </div>
+                            )}
+                          </button>
+                          {/* Détail participants */}
+                          {isOpen && (
+                            <div className="divide-y divide-border">
+                              {members.length === 0 ? (
+                                <p className="text-xs text-ink-3 px-4 py-3 text-center">Aucun participant lié à cette paroisse.</p>
+                              ) : members.sort((a, b) => a.nom.localeCompare(b.nom, 'fr')).map(p => {
+                                const paiePart = payByParticipant.get(p.id) ?? 0
+                                const restePart = prix != null ? prix - paiePart : null
+                                return (
+                                  <div key={p.id} className="flex items-center justify-between px-4 py-2.5 bg-canvas text-xs">
+                                    <span className="text-ink font-medium">{p.prenom} {p.nom}</span>
+                                    <div className="flex gap-3 items-center">
+                                      <span className="text-sage">{formatCFA(paiePart)}</span>
+                                      {restePart != null && <span className={restePart > 0 ? 'text-ember' : 'text-ink-3'}>{restePart > 0 ? `−${formatCFA(restePart)}` : '✓ soldé'}</span>}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
                         </div>
-                        {attendu != null && (
-                          <div className="flex gap-4 text-xs">
-                            <span className="text-ink-3">Attendu : <strong className="text-ink">{formatCFA(attendu)}</strong></span>
-                            <span className="text-ink-3">Payé : <strong className="text-sage">{formatCFA(paye)}</strong></span>
-                          </div>
-                        )}
-                        {attendu != null && (
-                          <div className="w-full bg-border rounded-full h-1.5 overflow-hidden">
-                            <div className="h-full bg-sage rounded-full transition-all" style={{ width: `${Math.min(100, attendu > 0 ? (paye / attendu) * 100 : 0)}%` }} />
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                      )
+                    })}
                     {totalAttendu > 0 && (
                       <div className="rounded-xl border border-sage/30 bg-sage/5 px-4 py-3 flex items-center justify-between">
                         <p className="text-sm font-semibold text-ink">Total global</p>
                         <div className="text-right text-xs space-y-0.5">
                           <p className="text-ink-3">Attendu : <strong className="text-ink">{formatCFA(totalAttendu)}</strong></p>
-                          <p className="text-ink-3">Payé : <strong className="text-sage">{formatCFA(totalPaye)}</strong> · Reste : <strong className="text-ember">{formatCFA(totalReste)}</strong></p>
+                          <p className="text-ink-3">Payé : <strong className="text-sage">{formatCFA(totalPaye)}</strong> · Reste : <strong className="text-ember">{formatCFA(totalAttendu - totalPaye)}</strong></p>
                         </div>
                       </div>
                     )}
