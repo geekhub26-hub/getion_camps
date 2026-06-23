@@ -7,6 +7,7 @@ import VisiteursPage from './VisiteursPage'
 import DonsPage from './DonsPage'
 import RapportPage from './RapportPage'
 import EnseignementsPage from './EnseignementsPage'
+import CauseriesPage from './CauseriesPage'
 
 import React from 'react'
 import ReactDOM from 'react-dom/client'
@@ -64,6 +65,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="dons" element={<DonsPage />} />
           <Route path="rapport" element={<RapportPage />} />
           <Route path="enseignements" element={<EnseignementsPage />} />
+          <Route path="causeries" element={<CauseriesPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

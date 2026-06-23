@@ -154,6 +154,7 @@ model Camp {
   dons            Don[]
   paroisses       CampParoisse[]
   enseignements   Enseignement[]
+  causeries       CauserieGroupe[]
 
   @@map("camps")
 }
@@ -285,6 +286,7 @@ model Groupe {
   animateur    Animateur?          @relation(fields: [animateurId], references: [id])
   participants ParticipantGroupe[]
   activites    ActiviteGroupe[]
+  causeries    CauserieGroupe[]
 
   @@map("groupes")
 }
@@ -552,6 +554,28 @@ model ArticleSac {
   participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
 
   @@map("articles_sac")
+}
+
+// ─────────────────────────────────────────
+//  CAUSERIE_GROUPE — Causeries quotidiennes par groupe
+// ─────────────────────────────────────────
+
+model CauserieGroupe {
+  id        String   @id @default(uuid())
+  groupeId  String   @map("groupe_id")
+  campId    String   @map("camp_id")
+  date      DateTime @db.Date
+  theme     String
+  resume    String?  @db.Text
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  groupe Groupe @relation(fields: [groupeId], references: [id], onDelete: Cascade)
+  camp   Camp   @relation(fields: [campId], references: [id], onDelete: Cascade)
+
+  @@unique([groupeId, date])
+  @@map("causerie_groupes")
 }
 
 // ─────────────────────────────────────────

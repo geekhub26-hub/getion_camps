@@ -25,6 +25,7 @@ const navItems = [
   { to: '/dons',        icon: Gift,            label: 'Dons' },
   { to: '/rapport',        icon: BookOpen,      label: 'Rapport journalier' },
   { to: '/enseignements',  icon: NotebookPen,   label: 'Enseignements' },
+  { to: '/causeries',      icon: MessageSquare, label: 'Causeries groupes' },
 ]
 
 export default function Sidebar() {
