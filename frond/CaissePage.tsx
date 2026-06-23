@@ -103,6 +103,8 @@ export default function CaissePage() {
   const [tab, setTab]           = useState<'today' | 'all' | 'paroisse'>('today')
   const [paroisses, setParoisses] = useState<CampParoisse[]>([])
   const [expandedParoisse, setExpandedParoisse] = useState<string | null>(null)
+  const [inlinePayPId, setInlinePayPId] = useState<string | null>(null)
+  const [inlinePayForm, setInlinePayForm] = useState({ montant: '', methode: 'MOBILE_MONEY' })
   const [error, setError]       = useState('')
   const [paySuccess, setPaySuccess] = useState('')
   const [saving, setSaving]     = useState(false)
@@ -147,6 +149,28 @@ export default function CaissePage() {
     void api.get<ApiList<DepItem>>(`/depenses?campId=${campId}`).then(({ data }) => setDepenses(data.data || [])).catch(() => setDepenses([]))
   }
   useEffect(() => { if (campId) load() }, [campId])
+
+  const saveInlinePay = async (participantId: string, prixParoisse: number | null) => {
+    const montant = Number(inlinePayForm.montant)
+    if (!montant || montant <= 0) return
+    const alreadyPaid = paiements
+      .filter(p => p.participantId === participantId && !['ANNULE', 'REMBOURSE'].includes(p.statut))
+      .reduce((s, p) => s + Number(p.montant), 0)
+    const total = prixParoisse ?? campPrice
+    const statut = (alreadyPaid + montant) >= total ? 'PAYE' : 'PARTIEL'
+    await api.post('/paiements', {
+      participantId,
+      campId,
+      montant,
+      montantTotal: total || undefined,
+      methode: inlinePayForm.methode,
+      statut,
+      datePaiement: new Date().toISOString(),
+    })
+    setInlinePayPId(null)
+    setInlinePayForm({ montant: '', methode: 'MOBILE_MONEY' })
+    load()
+  }
 
   const totalEntrees = useMemo(() => paiements.filter(p => !['ANNULE','REMBOURSE'].includes(p.statut)).reduce((s, p) => s + Number(p.montant), 0), [paiements])
   const totalSorties = useMemo(() => depenses.reduce((s, d) => s + Number(d.montant), 0), [depenses])
@@ -655,13 +679,63 @@ export default function CaissePage() {
                               ) : members.sort((a, b) => a.nom.localeCompare(b.nom, 'fr')).map(p => {
                                 const paiePart = payByParticipant.get(p.id) ?? 0
                                 const restePart = prix != null ? prix - paiePart : null
+                                const isEditingThis = inlinePayPId === p.id
                                 return (
-                                  <div key={p.id} className="flex items-center justify-between px-4 py-2.5 bg-canvas text-xs">
-                                    <span className="text-ink font-medium">{p.prenom} {p.nom}</span>
-                                    <div className="flex gap-3 items-center">
-                                      <span className="text-sage">{formatCFA(paiePart)}</span>
-                                      {restePart != null && <span className={restePart > 0 ? 'text-ember' : 'text-ink-3'}>{restePart > 0 ? `−${formatCFA(restePart)}` : '✓ soldé'}</span>}
+                                  <div key={p.id} className="bg-canvas border-b border-border last:border-0">
+                                    <div className="flex items-center justify-between px-4 py-2.5 text-xs">
+                                      <span className="text-ink font-medium">{p.prenom} {p.nom}</span>
+                                      <div className="flex gap-3 items-center">
+                                        <span className="text-sage font-semibold">{formatCFA(paiePart)}</span>
+                                        {restePart != null && (
+                                          <span className={restePart > 0 ? 'text-ember' : 'text-ink-3'}>
+                                            {restePart > 0 ? `−${formatCFA(restePart)}` : '✓ soldé'}
+                                          </span>
+                                        )}
+                                        <button
+                                          onClick={() => {
+                                            if (isEditingThis) { setInlinePayPId(null); return }
+                                            setInlinePayPId(p.id)
+                                            setInlinePayForm({ montant: restePart != null && restePart > 0 ? String(restePart) : '', methode: 'MOBILE_MONEY' })
+                                          }}
+                                          className={`p-1 rounded-lg transition-colors ${isEditingThis ? 'bg-ember/10 text-ember' : 'text-ink-3 hover:text-sage hover:bg-sage/10'}`}
+                                          title="Ajouter un paiement"
+                                        >
+                                          <Pencil size={11} />
+                                        </button>
+                                      </div>
                                     </div>
+                                    {isEditingThis && (
+                                      <div className="px-4 pb-3 flex gap-2 items-center flex-wrap">
+                                        <input
+                                          type="number"
+                                          min={1}
+                                          placeholder="Montant"
+                                          className="border border-border rounded-lg px-2.5 py-1.5 text-xs w-32 focus:outline-none focus:ring-2 focus:ring-sage/30"
+                                          value={inlinePayForm.montant}
+                                          onChange={e => setInlinePayForm(f => ({ ...f, montant: e.target.value }))}
+                                          autoFocus
+                                        />
+                                        <select
+                                          className="border border-border rounded-lg px-2 py-1.5 text-xs focus:outline-none"
+                                          value={inlinePayForm.methode}
+                                          onChange={e => setInlinePayForm(f => ({ ...f, methode: e.target.value }))}
+                                        >
+                                          {METHODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                        </select>
+                                        <button
+                                          onClick={() => saveInlinePay(p.id, prix)}
+                                          className="px-3 py-1.5 rounded-lg bg-sage text-white text-xs font-medium hover:bg-sage/90"
+                                        >
+                                          Enregistrer
+                                        </button>
+                                        <button
+                                          onClick={() => setInlinePayPId(null)}
+                                          className="px-2 py-1.5 rounded-lg text-ink-3 hover:bg-border text-xs"
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                    )}
                                   </div>
                                 )
                               })}
