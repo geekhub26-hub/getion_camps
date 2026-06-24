@@ -167,7 +167,7 @@ export default function GroupesPage() {
     description: ''
   })
   const [autoMsg, setAutoMsg] = useState('')
-  const [sansGroupe, setSansGroupe] = useState<{ id: string; nom: string; prenom: string; paroisse?: string }[]>([])
+  const [sansGroupe, setSansGroupe] = useState<{ id: string; nom: string; prenom: string; paroisse?: string; dateNaissance?: string; niveauScolaire?: string; genre?: string }[]>([])
   const [showSansGroupe, setShowSansGroupe] = useState(false)
   const [searchSG, setSearchSG] = useState('')
   const [assigningId, setAssigningId] = useState<string | null>(null)
@@ -455,12 +455,34 @@ export default function GroupesPage() {
               </div>
 
               {/* Liste */}
-              <div className="divide-y divide-amber-50 max-h-72 overflow-y-auto">
-                {filteredSG.map(p => (
-                  <div key={p.id} className="flex items-center justify-between px-4 py-2.5 gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-ink truncate">{p.prenom} {p.nom}</p>
-                      {p.paroisse && <p className="text-xs text-ink-3">{p.paroisse}</p>}
+              <div className="divide-y divide-amber-50 max-h-96 overflow-y-auto">
+                {filteredSG.map(p => {
+                  const age = p.dateNaissance ? (() => {
+                    const b = new Date(p.dateNaissance)
+                    const now = new Date()
+                    let a = now.getFullYear() - b.getUTCFullYear()
+                    const m = now.getMonth() - b.getUTCMonth()
+                    if (m < 0 || (m === 0 && now.getDate() < b.getUTCDate())) a--
+                    return a
+                  })() : null
+                  return (
+                  <div key={p.id} className="flex items-center justify-between px-4 py-3 gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-ink">{p.prenom} {p.nom}</p>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {age !== null && (
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-sky/10 text-sky font-medium">{age} ans</span>
+                        )}
+                        {p.niveauScolaire && (
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-sage/10 text-sage font-medium">{p.niveauScolaire}</span>
+                        )}
+                        {p.genre && (
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-surface border border-border text-ink-3">{p.genre}</span>
+                        )}
+                        {p.paroisse && (
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-surface border border-border text-ink-3">{p.paroisse}</span>
+                        )}
+                      </div>
                     </div>
                     {assigningId === p.id ? (
                       <div className="flex items-center gap-1.5 shrink-0">
@@ -490,7 +512,8 @@ export default function GroupesPage() {
                       </button>
                     )}
                   </div>
-                ))}
+                  )
+                })}
                 {filteredSG.length === 0 && (
                   <p className="text-center text-xs text-ink-3 py-4">Aucun résultat.</p>
                 )}
