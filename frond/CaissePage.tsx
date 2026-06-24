@@ -656,11 +656,18 @@ export default function CaissePage() {
                                 <p className="text-xs text-ink-3">{members.length} participant{members.length !== 1 ? 's' : ''}{prix != null ? ` · ${formatCFA(prix)}/pers.` : ''}</p>
                               </div>
                               <div className="flex items-center gap-3">
-                                <div className="text-right">
-                                  <p className={`text-sm font-bold ${reste != null && reste > 0 ? 'text-ember' : reste === 0 ? 'text-sage' : 'text-ink'}`}>
-                                    {reste != null ? formatCFA(reste) : `${formatCFA(paye)} payé`}
-                                  </p>
-                                  <p className="text-xs text-ink-3">{reste != null ? 'reste dû' : 'total payé'}</p>
+                                <div className="text-right space-y-0.5">
+                                  {attendu != null ? (
+                                    <>
+                                      <p className="text-xs text-ink-3">Total : <span className="font-semibold text-ink">{formatCFA(attendu)}</span></p>
+                                      <p className="text-xs text-ink-3">Payé : <span className="font-semibold text-sage">{formatCFA(paye)}</span></p>
+                                      <p className={`text-sm font-bold ${reste! > 0 ? 'text-ember' : 'text-sage'}`}>
+                                        {reste! > 0 ? `−${formatCFA(reste!)} reste` : '✓ Soldé'}
+                                      </p>
+                                    </>
+                                  ) : (
+                                    <p className="text-sm font-semibold text-sage">{formatCFA(paye)} payé</p>
+                                  )}
                                 </div>
                                 <span className="text-ink-3">{isOpen ? '▲' : '▼'}</span>
                               </div>

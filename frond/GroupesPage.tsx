@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Users, Plus, Edit2, Trash2, UserPlus, UserMinus, Palette, X } from 'lucide-react'
+import { Users, Plus, Edit2, Trash2, UserPlus, UserMinus, Palette, X, AlertCircle, Search } from 'lucide-react'
 import api from './http'
 import type { Camp } from './index'
 
@@ -167,6 +167,10 @@ export default function GroupesPage() {
     description: ''
   })
   const [autoMsg, setAutoMsg] = useState('')
+  const [sansGroupe, setSansGroupe] = useState<{ id: string; nom: string; prenom: string; paroisse?: string }[]>([])
+  const [showSansGroupe, setShowSansGroupe] = useState(false)
+  const [searchSG, setSearchSG] = useState('')
+  const [assigningId, setAssigningId] = useState<string | null>(null)
 
   // Charger les camps
   useEffect(() => {
@@ -199,10 +203,33 @@ export default function GroupesPage() {
       .catch(() => setAnimateurs([]))
   }
 
+  const loadSansGroupe = () => {
+    if (!campId) return
+    api.get(`/camps/${campId}/participants?perPage=500&sansGroupe=true`)
+      .then(res => setSansGroupe(res.data.data || []))
+      .catch(() => setSansGroupe([]))
+  }
+
   useEffect(() => {
     loadGroupes()
     loadAnimateurs()
+    loadSansGroupe()
   }, [campId])
+
+  const assignerGroupe = async (participantId: string, groupeId: string) => {
+    await api.post(`/groupes/${groupeId}/participants/${participantId}`)
+    setAssigningId(null)
+    loadGroupes()
+    loadSansGroupe()
+  }
+
+  const filteredSG = useMemo(() => {
+    const q = searchSG.toLowerCase().trim()
+    if (!q) return sansGroupe
+    return sansGroupe.filter(p =>
+      `${p.prenom} ${p.nom} ${p.paroisse ?? ''}`.toLowerCase().includes(q)
+    )
+  }, [sansGroupe, searchSG])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -393,6 +420,83 @@ export default function GroupesPage() {
           {groupes.map(groupe => (
             <GroupeCard key={groupe.id} groupe={groupe} onDelete={handleDelete} onEdit={handleEdit} />
           ))}
+        </div>
+      )}
+
+      {/* Participants sans groupe */}
+      {sansGroupe.length > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 overflow-hidden">
+          <button
+            className="w-full flex items-center justify-between px-5 py-3 hover:bg-amber-100 transition-colors"
+            onClick={() => setShowSansGroupe(v => !v)}
+          >
+            <div className="flex items-center gap-2">
+              <AlertCircle size={15} className="text-amber-600 shrink-0" />
+              <span className="font-semibold text-sm text-amber-800">
+                {sansGroupe.length} participant{sansGroupe.length > 1 ? 's' : ''} sans groupe
+              </span>
+            </div>
+            <span className="text-xs text-amber-600">{showSansGroupe ? 'Réduire ▲' : 'Voir ▼'}</span>
+          </button>
+
+          {showSansGroupe && (
+            <div className="border-t border-amber-200 bg-white">
+              {/* Barre de recherche */}
+              <div className="px-4 py-2 border-b border-amber-100">
+                <div className="relative">
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-3" />
+                  <input
+                    className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-border bg-canvas focus:outline-none"
+                    placeholder="Rechercher…"
+                    value={searchSG}
+                    onChange={e => setSearchSG(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Liste */}
+              <div className="divide-y divide-amber-50 max-h-72 overflow-y-auto">
+                {filteredSG.map(p => (
+                  <div key={p.id} className="flex items-center justify-between px-4 py-2.5 gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-ink truncate">{p.prenom} {p.nom}</p>
+                      {p.paroisse && <p className="text-xs text-ink-3">{p.paroisse}</p>}
+                    </div>
+                    {assigningId === p.id ? (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <select
+                          className="border border-border rounded-lg px-2 py-1 text-xs focus:outline-none"
+                          defaultValue=""
+                          onChange={e => e.target.value && assignerGroupe(p.id, e.target.value)}
+                        >
+                          <option value="" disabled>Choisir un groupe…</option>
+                          {groupes.map(g => (
+                            <option key={g.id} value={g.id}>{g.nom}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => setAssigningId(null)}
+                          className="text-ink-3 hover:text-ember p-1 rounded"
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setAssigningId(p.id)}
+                        className="shrink-0 text-xs px-2.5 py-1.5 rounded-lg border border-sage/40 text-sage hover:bg-sage/10 flex items-center gap-1 transition-colors"
+                      >
+                        <Plus size={12} /> Assigner
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {filteredSG.length === 0 && (
+                  <p className="text-center text-xs text-ink-3 py-4">Aucun résultat.</p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

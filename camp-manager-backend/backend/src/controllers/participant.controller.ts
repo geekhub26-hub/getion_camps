@@ -8,7 +8,7 @@ import { AuthRequest } from '../types'
 export const getParticipants = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { campId } = req.params
-    const { page = 1, perPage = 20, search, statut, groupeId } = req.query
+    const { page = 1, perPage = 20, search, statut, groupeId, sansGroupe } = req.query
 
     const skip = (Number(page) - 1) * Number(perPage)
     const where: any = { campId }
@@ -21,6 +21,7 @@ export const getParticipants = async (req: AuthRequest, res: Response, next: Nex
     }
     if (statut) where.statutInscription = statut
     if (groupeId) where.groupes = { some: { groupeId: String(groupeId) } }
+    if (sansGroupe === 'true') where.groupes = { none: {} }
 
     const [participants, total] = await Promise.all([
       prisma.participant.findMany({
