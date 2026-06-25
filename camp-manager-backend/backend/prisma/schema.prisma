@@ -519,14 +519,16 @@ model FichePresence {
 // ─────────────────────────────────────────
 
 model Visiteur {
-  id        String   @id @default(uuid())
-  campId    String   @map("camp_id")
-  nom       String
-  prenom    String
-  telephone String
-  qualite   String
-  notes     String?
-  createdAt DateTime @default(now()) @map("created_at")
+  id           String   @id @default(uuid())
+  campId       String   @map("camp_id")
+  nom          String
+  prenom       String
+  telephone    String
+  qualite      String
+  notes        String?
+  heureArrivee String?  @map("heure_arrivee")
+  heureDepart  String?  @map("heure_depart")
+  createdAt    DateTime @default(now()) @map("created_at")
 
   camp Camp @relation(fields: [campId], references: [id], onDelete: Cascade)
 

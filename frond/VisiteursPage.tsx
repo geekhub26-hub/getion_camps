@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { UserCheck, Plus, X, Trash2, Phone, Printer, Download } from 'lucide-react'
+import { UserCheck, Plus, X, Trash2, Phone, Printer, Download, Edit2 } from 'lucide-react'
 import api from './http'
 import type { Camp, Visiteur } from './index'
 
@@ -12,16 +12,17 @@ function getErrorMessage(err: unknown): string {
   return (err as any)?.response?.data?.message || 'Une erreur est survenue'
 }
 
-const emptyForm = { campIdForm: '', nom: '', prenom: '', telephone: '', qualite: '', notes: '' }
+const emptyForm = { campIdForm: '', nom: '', prenom: '', telephone: '', qualite: '', notes: '', heureArrivee: '', heureDepart: '' }
 
 export default function VisiteursPage() {
-  const [camps, setCamps]     = useState<Camp[]>([])
-  const [campId, setCampId]   = useState('')
+  const [camps, setCamps]         = useState<Camp[]>([])
+  const [campId, setCampId]       = useState('')
   const [visiteurs, setVisiteurs] = useState<Visiteur[]>([])
   const [showModal, setShowModal] = useState(false)
-  const [form, setForm]       = useState(emptyForm)
-  const [saving, setSaving]   = useState(false)
-  const [error, setError]     = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [form, setForm]           = useState(emptyForm)
+  const [saving, setSaving]       = useState(false)
+  const [error, setError]         = useState('')
 
   useEffect(() => {
     api.get<ApiList<Camp>>('/camps?perPage=100')
@@ -37,7 +38,21 @@ export default function VisiteursPage() {
   useEffect(load, [campId])
 
   const openNew = () => {
+    setEditingId(null)
     setForm({ ...emptyForm, campIdForm: campId })
+    setError(''); setShowModal(true)
+  }
+
+  const openEdit = (v: Visiteur) => {
+    setEditingId(v.id)
+    setForm({
+      campIdForm: v.campId,
+      nom: v.nom, prenom: v.prenom,
+      telephone: v.telephone, qualite: v.qualite,
+      notes: v.notes || '',
+      heureArrivee: v.heureArrivee || '',
+      heureDepart: v.heureDepart || '',
+    })
     setError(''); setShowModal(true)
   }
 
@@ -47,8 +62,18 @@ export default function VisiteursPage() {
     }
     setError(''); setSaving(true)
     try {
-      const { campIdForm, ...rest } = form
-      await api.post('/visiteurs', { ...rest, campId: campIdForm })
+      const payload = {
+        nom: form.nom, prenom: form.prenom,
+        telephone: form.telephone, qualite: form.qualite,
+        notes: form.notes || undefined,
+        heureArrivee: form.heureArrivee || undefined,
+        heureDepart: form.heureDepart || undefined,
+      }
+      if (editingId) {
+        await api.put(`/visiteurs/${editingId}`, payload)
+      } else {
+        await api.post('/visiteurs', { ...payload, campId: form.campIdForm })
+      }
       setShowModal(false); load()
     } catch (err) { setError(getErrorMessage(err)) }
     finally { setSaving(false) }
@@ -78,13 +103,15 @@ export default function VisiteursPage() {
       <div class="stat"><div class="lbl">Aujourd'hui</div><div class="val">${visiteurs.filter(v => new Date(v.createdAt).toDateString() === new Date().toDateString()).length}</div></div>
     </div>
     <table>
-      <thead><tr><th>#</th><th>Prénom &amp; Nom</th><th>Téléphone</th><th>Qualité / Fonction</th><th>Notes</th><th>Date de visite</th></tr></thead>
+      <thead><tr><th>#</th><th>Prénom &amp; Nom</th><th>Téléphone</th><th>Qualité / Fonction</th><th>Arrivée</th><th>Départ</th><th>Notes</th><th>Date de visite</th></tr></thead>
       <tbody>
         ${visiteurs.map((v, i) => `<tr>
           <td style="color:#94a3b8">${i + 1}</td>
           <td style="font-weight:600">${v.prenom} ${v.nom}</td>
           <td>${v.telephone}</td>
           <td><span class="badge">${v.qualite}</span></td>
+          <td>${v.heureArrivee || '—'}</td>
+          <td>${v.heureDepart || '—'}</td>
           <td style="color:#64748b">${v.notes || '—'}</td>
           <td style="color:#64748b;white-space:nowrap">${new Date(v.createdAt).toLocaleString('fr-FR', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })}</td>
         </tr>`).join('')}
@@ -97,9 +124,11 @@ export default function VisiteursPage() {
   }
 
   const exportCSV = () => {
-    const cols = ['N°','Prénom','Nom','Téléphone','Qualité / Fonction','Notes','Date de visite']
+    const cols = ['N°','Prénom','Nom','Téléphone','Qualité / Fonction','Heure arrivée','Heure départ','Notes','Date de visite']
     const rows = visiteurs.map((v, i) => [
-      i + 1, v.prenom, v.nom, v.telephone, v.qualite, v.notes || '',
+      i + 1, v.prenom, v.nom, v.telephone, v.qualite,
+      v.heureArrivee || '', v.heureDepart || '',
+      v.notes || '',
       new Date(v.createdAt).toLocaleString('fr-FR', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }),
     ])
     const content = [cols, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
@@ -154,6 +183,8 @@ export default function VisiteursPage() {
                   <th className="px-5 py-3 text-left">Nom / Prénom</th>
                   <th className="px-4 py-3 text-left">Téléphone</th>
                   <th className="px-4 py-3 text-left">Qualité / Fonction</th>
+                  <th className="px-4 py-3 text-left">Arrivée</th>
+                  <th className="px-4 py-3 text-left">Départ</th>
                   <th className="px-4 py-3 text-left">Notes</th>
                   <th className="px-4 py-3 text-left">Date de visite</th>
                   <th className="px-3 py-3"></th>
@@ -171,12 +202,24 @@ export default function VisiteursPage() {
                     <td className="px-4 py-3">
                       <span className="badge-muted">{v.qualite}</span>
                     </td>
-                    <td className="px-4 py-3 text-ink-3 text-xs max-w-[180px] truncate">{v.notes || '—'}</td>
+                    <td className="px-4 py-3 text-ink-2 whitespace-nowrap">{v.heureArrivee || <span className="text-ink-3">—</span>}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {v.heureDepart
+                        ? <span className="text-ember font-medium">{v.heureDepart}</span>
+                        : <span className="text-ink-3">—</span>
+                      }
+                    </td>
+                    <td className="px-4 py-3 text-ink-3 text-xs max-w-[160px] truncate">{v.notes || '—'}</td>
                     <td className="px-4 py-3 text-ink-3 whitespace-nowrap">{formatDateTime(v.createdAt)}</td>
                     <td className="px-3 py-3">
-                      <button onClick={() => deleteVisiteur(v.id)} className="text-ink-3 hover:text-ember transition-colors">
-                        <Trash2 size={14} />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => openEdit(v)} className="text-ink-3 hover:text-sage transition-colors p-0.5" title="Modifier">
+                          <Edit2 size={13} />
+                        </button>
+                        <button onClick={() => deleteVisiteur(v.id)} className="text-ink-3 hover:text-ember transition-colors p-0.5" title="Supprimer">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -186,34 +229,51 @@ export default function VisiteursPage() {
         )}
       </div>
 
-      {/* Modal */}
+      {/* Modal création / édition */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-ink/25 backdrop-blur-sm" onClick={() => setShowModal(false)} />
           <div className="relative bg-white rounded-2xl shadow-modal w-full max-w-md p-6 space-y-4 animate-fade-up">
             <div className="flex items-center justify-between">
-              <h2 className="font-display font-700 text-base text-ink">Nouveau visiteur</h2>
+              <h2 className="font-display font-700 text-base text-ink">
+                {editingId ? 'Modifier le visiteur' : 'Nouveau visiteur'}
+              </h2>
               <button onClick={() => setShowModal(false)} className="text-ink-3 hover:text-ink p-1 rounded-lg hover:bg-surface"><X size={17} /></button>
             </div>
             {error && <div className="rounded-xl border border-ember/20 bg-ember/8 px-3 py-2.5 text-sm text-ember">{error}</div>}
             <div className="space-y-3">
-              <div>
-                <label className="text-xs font-medium text-ink-3 mb-1 block">Camp *</label>
-                <select className="input-field" value={form.campIdForm} onChange={e => setForm({ ...form, campIdForm: e.target.value })}>
-                  <option value="">— Sélectionner —</option>
-                  {camps.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
-                </select>
-              </div>
+              {!editingId && (
+                <div>
+                  <label className="text-xs font-medium text-ink-3 mb-1 block">Camp *</label>
+                  <select className="input-field" value={form.campIdForm} onChange={e => setForm({ ...form, campIdForm: e.target.value })}>
+                    <option value="">— Sélectionner —</option>
+                    {camps.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+                  </select>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <input className="input-field" placeholder="Nom *" value={form.nom} onChange={e => setForm({ ...form, nom: e.target.value })} />
                 <input className="input-field" placeholder="Prénom *" value={form.prenom} onChange={e => setForm({ ...form, prenom: e.target.value })} />
               </div>
               <input className="input-field" placeholder="Numéro de téléphone *" value={form.telephone} onChange={e => setForm({ ...form, telephone: e.target.value })} />
-              <input className="input-field" placeholder="Qualité / Fonction * (ex: Parent, Inspecteur, Journaliste…)" value={form.qualite} onChange={e => setForm({ ...form, qualite: e.target.value })} />
+              <input className="input-field" placeholder="Qualité / Fonction * (ex: Parent, Inspecteur…)" value={form.qualite} onChange={e => setForm({ ...form, qualite: e.target.value })} />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-ink-3 mb-1 block">Heure d'arrivée</label>
+                  <input type="time" className="input-field" value={form.heureArrivee} onChange={e => setForm({ ...form, heureArrivee: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-ink-3 mb-1 block">Heure de départ</label>
+                  <input type="time" className="input-field" value={form.heureDepart} onChange={e => setForm({ ...form, heureDepart: e.target.value })} />
+                </div>
+              </div>
               <textarea className="input-field min-h-[60px] resize-none" placeholder="Notes (optionnel)" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
             </div>
             <button onClick={save} disabled={saving} className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
-              {saving ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Enregistrement…</> : 'Enregistrer le visiteur'}
+              {saving
+                ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Enregistrement…</>
+                : editingId ? 'Enregistrer les modifications' : 'Enregistrer le visiteur'
+              }
             </button>
           </div>
         </div>

@@ -163,6 +163,8 @@ export interface Visiteur {
   telephone: string
   qualite: string
   notes?: string
+  heureArrivee?: string
+  heureDepart?: string
   camp?: { id: string; nom: string }
   createdAt: string
 }
