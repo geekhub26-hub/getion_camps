@@ -113,18 +113,36 @@ export const updatePaiement = async (req: AuthRequest, res: Response, next: Next
     const paiement = await prisma.paiement.findUnique({ where: { id: req.params.id } })
     if (!paiement) throw new AppError('Paiement introuvable', 404)
 
-    // Skip amount validation for direct entries
-    if (paiement.participantId && (req.body.montant || req.body.montantTotal)) {
-      const prochainMontant = req.body.montant ? Number(req.body.montant) : Number(paiement.montant)
-      const prochainTotal = req.body.montantTotal ? Number(req.body.montantTotal) : Number(paiement.montantTotal)
+    // Only block increases that would exceed the total; corrections (reductions) are always allowed
+    if (paiement.participantId && req.body.montant) {
+      const prochainMontant = Number(req.body.montant)
+      const ancienMontant = Number(paiement.montant)
+      if (prochainMontant > ancienMontant) {
+        const prochainTotal = req.body.montantTotal ? Number(req.body.montantTotal) : Number(paiement.montantTotal)
+        if (prochainTotal > 0) {
+          const dejaPaye = await prisma.paiement.aggregate({
+            where: { participantId: paiement.participantId!, id: { not: paiement.id }, statut: { notIn: ['ANNULE', 'REMBOURSE'] } },
+            _sum: { montant: true },
+          })
+          const totalApresModification = Number(dejaPaye._sum.montant || 0) + prochainMontant
+          if (totalApresModification > prochainTotal) {
+            throw new AppError(`Modification refusée : le total payé (${totalApresModification}) dépasse le montant fixé (${prochainTotal})`, 400)
+          }
+        }
+      }
+    }
+
+    // Recalculate statut when amount changes
+    let statutAuto: string | undefined
+    if (req.body.montant && paiement.participantId) {
+      const nouveauMontant = Number(req.body.montant)
+      const total = req.body.montantTotal ? Number(req.body.montantTotal) : Number(paiement.montantTotal)
       const dejaPaye = await prisma.paiement.aggregate({
         where: { participantId: paiement.participantId!, id: { not: paiement.id }, statut: { notIn: ['ANNULE', 'REMBOURSE'] } },
         _sum: { montant: true },
       })
-      const totalApresModification = Number(dejaPaye._sum.montant || 0) + prochainMontant
-      if (totalApresModification > prochainTotal) {
-        throw new AppError(`Modification refusée : le total payé (${totalApresModification}) dépasse le montant fixé (${prochainTotal})`, 400)
-      }
+      const totalPaye = Number(dejaPaye._sum.montant || 0) + nouveauMontant
+      if (total > 0) statutAuto = totalPaye >= total ? 'PAYE' : 'PARTIEL'
     }
 
     const updated = await prisma.paiement.update({
@@ -134,6 +152,7 @@ export const updatePaiement = async (req: AuthRequest, res: Response, next: Next
         montant: req.body.montant ? Number(req.body.montant) : undefined,
         montantTotal: req.body.montantTotal ? Number(req.body.montantTotal) : undefined,
         datePaiement: req.body.datePaiement ? new Date(req.body.datePaiement) : undefined,
+        ...(statutAuto && !req.body.statut ? { statut: statutAuto } : {}),
       },
     })
 
