@@ -712,35 +712,64 @@ export default function CaissePage() {
                                       </div>
                                     </div>
                                     {isEditingThis && (
-                                      <div className="px-4 pb-3 flex gap-2 items-center flex-wrap">
-                                        <input
-                                          type="number"
-                                          min={1}
-                                          placeholder="Montant"
-                                          className="border border-border rounded-lg px-2.5 py-1.5 text-xs w-32 focus:outline-none focus:ring-2 focus:ring-sage/30"
-                                          value={inlinePayForm.montant}
-                                          onChange={e => setInlinePayForm(f => ({ ...f, montant: e.target.value }))}
-                                          autoFocus
-                                        />
-                                        <select
-                                          className="border border-border rounded-lg px-2 py-1.5 text-xs focus:outline-none"
-                                          value={inlinePayForm.methode}
-                                          onChange={e => setInlinePayForm(f => ({ ...f, methode: e.target.value }))}
-                                        >
-                                          {METHODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                                        </select>
-                                        <button
-                                          onClick={() => saveInlinePay(p.id, prix)}
-                                          className="px-3 py-1.5 rounded-lg bg-sage text-white text-xs font-medium hover:bg-sage/90"
-                                        >
-                                          Enregistrer
-                                        </button>
-                                        <button
-                                          onClick={() => setInlinePayPId(null)}
-                                          className="px-2 py-1.5 rounded-lg text-ink-3 hover:bg-border text-xs"
-                                        >
-                                          ✕
-                                        </button>
+                                      <div className="border-t border-border bg-white px-4 pt-2 pb-3 space-y-2">
+                                        {/* Paiements existants */}
+                                        {paiements.filter(pay => pay.participantId === p.id && !['ANNULE','REMBOURSE'].includes(pay.statut)).map(pay => (
+                                          <div key={pay.id} className="flex items-center gap-2 text-xs">
+                                            {editPayId === pay.id ? (
+                                              <>
+                                                <input
+                                                  type="number" min={1}
+                                                  className="border border-sage rounded-lg px-2 py-1 text-xs w-28 focus:outline-none focus:ring-2 focus:ring-sage/30"
+                                                  value={editPayMontant}
+                                                  onChange={e => setEditPayMontant(e.target.value)}
+                                                  autoFocus
+                                                />
+                                                <button onClick={() => saveEditPay(pay.id, p.id)} className="px-2 py-1 rounded-lg bg-sage text-white text-xs">✓</button>
+                                                <button onClick={() => setEditPayId(null)} className="px-2 py-1 rounded-lg text-ink-3 hover:bg-border text-xs">✕</button>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <span className="text-sage font-semibold w-24 shrink-0">{formatCFA(Number(pay.montant))}</span>
+                                                <span className="text-ink-3 flex-1">{METHODES.find(m => m.value === pay.methode)?.label ?? pay.methode}{pay.datePaiement ? ` · ${new Date(pay.datePaiement).toLocaleDateString('fr-FR')}` : ''}</span>
+                                                <button
+                                                  onClick={() => { setEditPayId(pay.id); setEditPayMontant(String(pay.montant)) }}
+                                                  className="text-ink-3 hover:text-sage p-0.5 rounded"
+                                                  title="Modifier ce paiement"
+                                                ><Pencil size={11} /></button>
+                                                <button
+                                                  onClick={async () => { if (window.confirm('Supprimer ce paiement ?')) { await api.delete(`/paiements/${pay.id}`); load() } }}
+                                                  className="text-ink-3 hover:text-ember p-0.5 rounded"
+                                                  title="Supprimer"
+                                                ><Trash2 size={11} /></button>
+                                              </>
+                                            )}
+                                          </div>
+                                        ))}
+                                        {/* Ajouter un paiement */}
+                                        <div className="flex gap-2 items-center flex-wrap pt-1 border-t border-dashed border-border">
+                                          <input
+                                            type="number" min={1}
+                                            placeholder="Nouveau montant"
+                                            className="border border-border rounded-lg px-2.5 py-1.5 text-xs w-36 focus:outline-none focus:ring-2 focus:ring-sage/30"
+                                            value={inlinePayForm.montant}
+                                            onChange={e => setInlinePayForm(f => ({ ...f, montant: e.target.value }))}
+                                          />
+                                          <select
+                                            className="border border-border rounded-lg px-2 py-1.5 text-xs focus:outline-none"
+                                            value={inlinePayForm.methode}
+                                            onChange={e => setInlinePayForm(f => ({ ...f, methode: e.target.value }))}
+                                          >
+                                            {METHODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                          </select>
+                                          <button
+                                            onClick={() => saveInlinePay(p.id, prix)}
+                                            className="px-3 py-1.5 rounded-lg bg-sage text-white text-xs font-medium hover:bg-sage/90"
+                                          >
+                                            <Plus size={11} className="inline mr-1" />Ajouter
+                                          </button>
+                                          <button onClick={() => setInlinePayPId(null)} className="px-2 py-1.5 rounded-lg text-ink-3 hover:bg-border text-xs">✕</button>
+                                        </div>
                                       </div>
                                     )}
                                   </div>
