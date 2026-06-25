@@ -46,6 +46,23 @@ export const createDon = async (req: AuthRequest, res: Response, next: NextFunct
   }
 }
 
+export const updateDon = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const don = await prisma.don.findUnique({ where: { id: req.params.id } })
+    if (!don) throw new AppError('Don introuvable', 404)
+
+    const { nom, prenom, telephone, description, montant, notes } = req.body
+    const updated = await prisma.don.update({
+      where: { id: req.params.id },
+      data: { nom, prenom, telephone, description, notes,
+        montant: montant !== undefined ? (montant ? Number(montant) : null) : undefined },
+    })
+    sendSuccess(res, updated, 'Don mis à jour')
+  } catch (err) {
+    next(err)
+  }
+}
+
 export const deleteDon = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const don = await prisma.don.findUnique({ where: { id: req.params.id } })

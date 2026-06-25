@@ -5,8 +5,9 @@ import { authenticate, staffOnly, adminOnly } from '../middlewares/auth.middlewa
 const router = Router()
 router.use(authenticate)
 
-router.get('/',      staffOnly, d.getDons)
-router.post('/',     staffOnly, d.createDon)
+router.get('/',       staffOnly, d.getDons)
+router.post('/',      staffOnly, d.createDon)
+router.put('/:id',    staffOnly, d.updateDon)
 router.delete('/:id', adminOnly, d.deleteDon)
 
 export default router

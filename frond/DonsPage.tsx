@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Gift, Plus, X, Trash2, Phone, TrendingUp, Printer, Download } from 'lucide-react'
+import { Gift, Plus, X, Trash2, Phone, TrendingUp, Printer, Download, Edit2 } from 'lucide-react'
 import api from './http'
 import type { Camp, Don } from './index'
 
@@ -22,6 +22,7 @@ export default function DonsPage() {
   const [campId, setCampId] = useState('')
   const [dons, setDons]     = useState<Don[]>([])
   const [showModal, setShowModal] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm]     = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
@@ -43,22 +44,43 @@ export default function DonsPage() {
   const donsAvecMontant = dons.filter(d => d.montant && Number(d.montant) > 0).length
 
   const openNew = () => {
+    setEditingId(null)
     setForm({ ...emptyForm, campIdForm: campId })
     setError(''); setShowModal(true)
   }
 
+  const openEdit = (d: Don) => {
+    setEditingId(d.id)
+    setForm({
+      campIdForm: d.campId,
+      nom: d.nom, prenom: d.prenom,
+      telephone: d.telephone, description: d.description,
+      montant: d.montant ? String(d.montant) : '',
+      notes: d.notes || '',
+    })
+    setError(''); setShowModal(true)
+  }
+
   const save = async () => {
-    if (!form.campIdForm || !form.nom || !form.prenom || !form.telephone || !form.description) {
+    if (!form.nom || !form.prenom || !form.telephone || !form.description) {
       setError('Veuillez remplir tous les champs obligatoires.'); return
+    }
+    if (!editingId && !form.campIdForm) {
+      setError('Veuillez sélectionner un camp.'); return
     }
     setError(''); setSaving(true)
     try {
-      const { campIdForm, montant, ...rest } = form
-      await api.post('/dons', {
-        ...rest,
-        campId: campIdForm,
-        montant: montant ? Number(montant) : undefined,
-      })
+      const payload = {
+        nom: form.nom, prenom: form.prenom,
+        telephone: form.telephone, description: form.description,
+        montant: form.montant ? Number(form.montant) : undefined,
+        notes: form.notes || undefined,
+      }
+      if (editingId) {
+        await api.put(`/dons/${editingId}`, payload)
+      } else {
+        await api.post('/dons', { ...payload, campId: form.campIdForm })
+      }
       setShowModal(false); load()
     } catch (err) { setError(getErrorMessage(err)) }
     finally { setSaving(false) }
@@ -225,9 +247,14 @@ export default function DonsPage() {
                     <td className="px-4 py-3 text-ink-3 text-xs max-w-[160px] truncate">{d.notes || '—'}</td>
                     <td className="px-4 py-3 text-ink-3 whitespace-nowrap">{formatDateTime(d.createdAt)}</td>
                     <td className="px-3 py-3">
-                      <button onClick={() => deleteDon(d.id)} className="text-ink-3 hover:text-ember transition-colors">
-                        <Trash2 size={14} />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => openEdit(d)} className="text-ink-3 hover:text-sage transition-colors p-0.5" title="Modifier">
+                          <Edit2 size={13} />
+                        </button>
+                        <button onClick={() => deleteDon(d.id)} className="text-ink-3 hover:text-ember transition-colors p-0.5" title="Supprimer">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -243,18 +270,22 @@ export default function DonsPage() {
           <div className="absolute inset-0 bg-ink/25 backdrop-blur-sm" onClick={() => setShowModal(false)} />
           <div className="relative bg-white rounded-2xl shadow-modal w-full max-w-md p-6 space-y-4 animate-fade-up">
             <div className="flex items-center justify-between">
-              <h2 className="font-display font-700 text-base text-ink">Enregistrer un don</h2>
+              <h2 className="font-display font-700 text-base text-ink">
+                {editingId ? 'Modifier le don' : 'Enregistrer un don'}
+              </h2>
               <button onClick={() => setShowModal(false)} className="text-ink-3 hover:text-ink p-1 rounded-lg hover:bg-surface"><X size={17} /></button>
             </div>
             {error && <div className="rounded-xl border border-ember/20 bg-ember/8 px-3 py-2.5 text-sm text-ember">{error}</div>}
             <div className="space-y-3">
-              <div>
-                <label className="text-xs font-medium text-ink-3 mb-1 block">Camp *</label>
-                <select className="input-field" value={form.campIdForm} onChange={e => setForm({ ...form, campIdForm: e.target.value })}>
-                  <option value="">— Sélectionner —</option>
-                  {camps.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
-                </select>
-              </div>
+              {!editingId && (
+                <div>
+                  <label className="text-xs font-medium text-ink-3 mb-1 block">Camp *</label>
+                  <select className="input-field" value={form.campIdForm} onChange={e => setForm({ ...form, campIdForm: e.target.value })}>
+                    <option value="">— Sélectionner —</option>
+                    {camps.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+                  </select>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <input className="input-field" placeholder="Nom *" value={form.nom} onChange={e => setForm({ ...form, nom: e.target.value })} />
                 <input className="input-field" placeholder="Prénom *" value={form.prenom} onChange={e => setForm({ ...form, prenom: e.target.value })} />
@@ -268,7 +299,10 @@ export default function DonsPage() {
               <textarea className="input-field min-h-[60px] resize-none" placeholder="Notes (optionnel)" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
             </div>
             <button onClick={save} disabled={saving} className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
-              {saving ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Enregistrement…</> : 'Enregistrer le don'}
+              {saving
+                ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Enregistrement…</>
+                : editingId ? 'Enregistrer les modifications' : 'Enregistrer le don'
+              }
             </button>
           </div>
         </div>

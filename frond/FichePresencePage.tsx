@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ClipboardList, Plus, X, Trash2, Check, Clock, LogIn, Printer, Download } from 'lucide-react'
+import { ClipboardList, Plus, X, Trash2, Check, Clock, LogIn, Printer, Download, Edit2 } from 'lucide-react'
 import api from './http'
 import type { Camp, FichePresence, TypePresence } from './index'
 
@@ -42,6 +42,7 @@ export default function FichePresencePage() {
   const [filtre, setFiltre]     = useState<TypePresence | ''>('')
   const [fiches, setFiches]     = useState<FichePresence[]>([])
   const [showModal, setShowModal] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [showRetour, setShowRetour] = useState<FichePresence | null>(null)
   const [retourForm, setRetourForm] = useState({ heureRetour: '', signature: '' })
   const [form, setForm]         = useState(emptyForm)
@@ -65,20 +66,42 @@ export default function FichePresencePage() {
   useEffect(load, [campId, filtre])
 
   const openNew = () => {
+    setEditingId(null)
     const now = toLocalInput(new Date().toISOString())
     setForm({ ...emptyForm, campIdForm: campId, heureSortie: now })
     setError('')
     setShowModal(true)
   }
 
+  const openEdit = (f: FichePresence) => {
+    setEditingId(f.id)
+    setForm({
+      campIdForm: f.campId,
+      type: f.type,
+      nom: f.nom, prenom: f.prenom,
+      heureSortie: toLocalInput(f.heureSortie),
+      motif: f.motif,
+      notes: f.notes || '',
+    })
+    setError('')
+    setShowModal(true)
+  }
+
   const save = async () => {
-    if (!form.campIdForm || !form.nom || !form.prenom || !form.heureSortie || !form.motif) {
+    if (!form.nom || !form.prenom || !form.heureSortie || !form.motif) {
       setError('Veuillez remplir tous les champs obligatoires.'); return
+    }
+    if (!editingId && !form.campIdForm) {
+      setError('Veuillez sélectionner un camp.'); return
     }
     setError(''); setSaving(true)
     try {
       const { campIdForm, ...rest } = form
-      await api.post('/fiches-presence', { ...rest, campId: campIdForm })
+      if (editingId) {
+        await api.put(`/fiches-presence/${editingId}`, rest)
+      } else {
+        await api.post('/fiches-presence', { ...rest, campId: campIdForm })
+      }
       setShowModal(false); load()
     } catch (err) { setError(getErrorMessage(err)) }
     finally { setSaving(false) }
@@ -280,9 +303,14 @@ export default function FichePresencePage() {
                       }
                     </td>
                     <td className="px-3 py-3">
-                      <button onClick={() => deleteFiche(f.id)} className="text-ink-3 hover:text-ember transition-colors">
-                        <Trash2 size={14} />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => openEdit(f)} className="text-ink-3 hover:text-sage transition-colors p-0.5" title="Modifier">
+                          <Edit2 size={13} />
+                        </button>
+                        <button onClick={() => deleteFiche(f.id)} className="text-ink-3 hover:text-ember transition-colors p-0.5" title="Supprimer">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -298,7 +326,9 @@ export default function FichePresencePage() {
           <div className="absolute inset-0 bg-ink/25 backdrop-blur-sm" onClick={() => setShowModal(false)} />
           <div className="relative bg-white rounded-2xl shadow-modal w-full max-w-md p-6 space-y-4 animate-fade-up">
             <div className="flex items-center justify-between">
-              <h2 className="font-display font-700 text-base text-ink">Enregistrer une sortie</h2>
+              <h2 className="font-display font-700 text-base text-ink">
+                {editingId ? 'Modifier la fiche' : 'Enregistrer une sortie'}
+              </h2>
               <button onClick={() => setShowModal(false)} className="text-ink-3 hover:text-ink p-1 rounded-lg hover:bg-surface"><X size={17} /></button>
             </div>
             {error && <div className="rounded-xl border border-ember/20 bg-ember/8 px-3 py-2.5 text-sm text-ember">{error}</div>}
@@ -333,7 +363,10 @@ export default function FichePresencePage() {
               <textarea className="input-field min-h-[60px] resize-none" placeholder="Notes (optionnel)" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
             </div>
             <button onClick={save} disabled={saving} className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
-              {saving ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Enregistrement…</> : 'Enregistrer la sortie'}
+              {saving
+                ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Enregistrement…</>
+                : editingId ? 'Enregistrer les modifications' : 'Enregistrer la sortie'
+              }
             </button>
           </div>
         </div>
